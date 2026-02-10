@@ -1,0 +1,1432 @@
+{
+  "api": "https://f1api.dev",
+  "url": "https://f1api.dev/api/2026",
+  "limit": 30,
+  "offset": 0,
+  "total": 24,
+  "season": 2026,
+  "championship": {
+    "championshipId": "f1_2026",
+    "championshipName": "2026 Formula 1 World Championship",
+    "url": "https://en.wikipedia.org/wiki/2026_Formula_One_World_Championship",
+    "year": 2026
+  },
+  "races": [
+    {
+      "raceId": "australian_2026",
+      "championshipId": "f1_2026",
+      "raceName": "Formula 1 Qatar Airways Australian Grand Prix",
+      "schedule": {
+        "race": {
+          "date": "2026-03-08",
+          "time": "04:00:00Z"
+        },
+        "qualy": {
+          "date": "2026-03-07",
+          "time": "05:00:00Z"
+        },
+        "fp1": {
+          "date": "2026-03-06",
+          "time": "01:30:00Z"
+        },
+        "fp2": {
+          "date": "2026-03-06",
+          "time": "05:00:00Z"
+        },
+        "fp3": {
+          "date": "2026-03-07",
+          "time": "01:30:00Z"
+        },
+        "sprintQualy": {
+          "date": null,
+          "time": null
+        },
+        "sprintRace": {
+          "date": null,
+          "time": null
+        }
+      },
+      "laps": 58,
+      "round": 1,
+      "url": "https://en.wikipedia.org/wiki/2026_Australian_Grand_Prix",
+      "fast_lap": {
+        "fast_lap": null,
+        "fast_lap_driver_id": null,
+        "fast_lap_team_id": null
+      },
+      "circuit": {
+        "circuitId": "albert_park",
+        "circuitName": "Albert Park Circuit",
+        "country": "Australia",
+        "city": "Melbourne",
+        "circuitLength": "5278km",
+        "lapRecord": "1:19:813",
+        "firstParticipationYear": 1996,
+        "corners": 14,
+        "fastestLapDriverId": "leclerc",
+        "fastestLapTeamId": "ferrari",
+        "fastestLapYear": 2024,
+        "url": "https://en.wikipedia.org/wiki/Albert_Park_Circuit"
+      },
+      "winner": null,
+      "teamWinner": null
+    },
+    {
+      "raceId": "chinese_2026",
+      "championshipId": "f1_2026",
+      "raceName": "Formula 1 Heineken Chinese Grand Prix 2026",
+      "schedule": {
+        "race": {
+          "date": "2026-04-15",
+          "time": "07:00:00Z"
+        },
+        "qualy": {
+          "date": "2026-03-14",
+          "time": "07:00:00Z"
+        },
+        "fp1": {
+          "date": "2026-03-13",
+          "time": "03:30:00Z"
+        },
+        "fp2": {
+          "date": null,
+          "time": null
+        },
+        "fp3": {
+          "date": null,
+          "time": null
+        },
+        "sprintQualy": {
+          "date": "2026-03-13",
+          "time": "07:30:00Z"
+        },
+        "sprintRace": {
+          "date": "2026-03-14",
+          "time": "03:00:00Z"
+        }
+      },
+      "laps": 56,
+      "round": 2,
+      "url": "https://en.wikipedia.org/wiki/2026_Chinese_Grand_Prix",
+      "fast_lap": {
+        "fast_lap": null,
+        "fast_lap_driver_id": null,
+        "fast_lap_team_id": null
+      },
+      "circuit": {
+        "circuitId": "shanghai",
+        "circuitName": "Shanghai International Circuit",
+        "country": "China",
+        "city": "Shanghai",
+        "circuitLength": "5451km",
+        "lapRecord": "1:32:238",
+        "firstParticipationYear": 2004,
+        "corners": 16,
+        "fastestLapDriverId": "michael_schumacher",
+        "fastestLapTeamId": "ferrari",
+        "fastestLapYear": 2004,
+        "url": "http://en.wikipedia.org/wiki/Shanghai_International_Circuit"
+      },
+      "winner": null,
+      "teamWinner": null
+    },
+    {
+      "raceId": "japanese_2026",
+      "championshipId": "f1_2026",
+      "raceName": "Formula 1 Aramco Japanese Grand Prix 2026",
+      "schedule": {
+        "race": {
+          "date": "2026-03-29",
+          "time": "05:00:00Z"
+        },
+        "qualy": {
+          "date": "2026-03-28",
+          "time": "06:00:00Z"
+        },
+        "fp1": {
+          "date": "2026-03-27",
+          "time": "02:30:00Z"
+        },
+        "fp2": {
+          "date": "2026-03-27",
+          "time": "06:00:00Z"
+        },
+        "fp3": {
+          "date": "2026-03-28",
+          "time": "02:30:00Z"
+        },
+        "sprintQualy": {
+          "date": null,
+          "time": null
+        },
+        "sprintRace": {
+          "date": null,
+          "time": null
+        }
+      },
+      "laps": 53,
+      "round": 3,
+      "url": "https://en.wikipedia.org/wiki/2026_Japanese_Grand_Prix",
+      "fast_lap": {
+        "fast_lap": null,
+        "fast_lap_driver_id": null,
+        "fast_lap_team_id": null
+      },
+      "circuit": {
+        "circuitId": "suzuka",
+        "circuitName": "Suzuka International Circuit",
+        "country": "Japan",
+        "city": "Suzuka",
+        "circuitLength": "5807km",
+        "lapRecord": "1:30:983",
+        "firstParticipationYear": 1987,
+        "corners": 18,
+        "fastestLapDriverId": "hamilton",
+        "fastestLapTeamId": "mercedes",
+        "fastestLapYear": 2019,
+        "url": "https://en.wikipedia.org/wiki/Suzuka_International_Racing_Course"
+      },
+      "winner": null,
+      "teamWinner": null
+    },
+    {
+      "raceId": "bahrain_2026",
+      "championshipId": "f1_2026",
+      "raceName": "Formula 1 Gulf Air Bahrain Grand Prix 2026",
+      "schedule": {
+        "race": {
+          "date": "2026-04-12",
+          "time": "15:00:00Z"
+        },
+        "qualy": {
+          "date": "2026-04-11",
+          "time": "16:00:00Z"
+        },
+        "fp1": {
+          "date": "2026-04-10",
+          "time": "11:30:00Z"
+        },
+        "fp2": {
+          "date": "2026-04-10",
+          "time": "15:00:00Z"
+        },
+        "fp3": {
+          "date": "2026-04-11",
+          "time": "12:30:00Z"
+        },
+        "sprintQualy": {
+          "date": null,
+          "time": null
+        },
+        "sprintRace": {
+          "date": null,
+          "time": null
+        }
+      },
+      "laps": 57,
+      "round": 4,
+      "url": "https://en.wikipedia.org/wiki/2026_Bahrain_Grand_Prix",
+      "fast_lap": {
+        "fast_lap": null,
+        "fast_lap_driver_id": null,
+        "fast_lap_team_id": null
+      },
+      "circuit": {
+        "circuitId": "bahrain",
+        "circuitName": "Bahrain International Circuit",
+        "country": "Bahrain",
+        "city": "Sakhir",
+        "circuitLength": "5412km",
+        "lapRecord": "1:31:447",
+        "firstParticipationYear": 2004,
+        "corners": 15,
+        "fastestLapDriverId": "de_la_rosa",
+        "fastestLapTeamId": "mclaren",
+        "fastestLapYear": 2005,
+        "url": "http://en.wikipedia.org/wiki/Bahrain_International_Circuit"
+      },
+      "winner": null,
+      "teamWinner": null
+    },
+    {
+      "raceId": "saudi_arabia_2026",
+      "championshipId": "f1_2026",
+      "raceName": "Formula 1 STC Saudi Arabian Grand Prix 2026",
+      "schedule": {
+        "race": {
+          "date": "2026-04-19",
+          "time": "17:00:00Z"
+        },
+        "qualy": {
+          "date": "2026-04-18",
+          "time": "17:00:00Z"
+        },
+        "fp1": {
+          "date": "2026-04-17",
+          "time": "13:30:00Z"
+        },
+        "fp2": {
+          "date": "2026-04-17",
+          "time": "17:00:00Z"
+        },
+        "fp3": {
+          "date": "2026-04-18",
+          "time": "13:30:00Z"
+        },
+        "sprintQualy": {
+          "date": null,
+          "time": null
+        },
+        "sprintRace": {
+          "date": null,
+          "time": null
+        }
+      },
+      "laps": 50,
+      "round": 5,
+      "url": "https://en.wikipedia.org/wiki/2026_Saudi_Arabian_Grand_Prix",
+      "fast_lap": {
+        "fast_lap": null,
+        "fast_lap_driver_id": null,
+        "fast_lap_team_id": null
+      },
+      "circuit": {
+        "circuitId": "jeddah",
+        "circuitName": "Jeddah Corniche Circuit",
+        "country": "Saudi Arabia",
+        "city": "Jedda",
+        "circuitLength": "6174km",
+        "lapRecord": "1:30:734",
+        "firstParticipationYear": 2021,
+        "corners": 27,
+        "fastestLapDriverId": "hamilton",
+        "fastestLapTeamId": "mercedes",
+        "fastestLapYear": 2021,
+        "url": "https://en.wikipedia.org/wiki/Jeddah_Corniche_Circuit"
+      },
+      "winner": null,
+      "teamWinner": null
+    },
+    {
+      "raceId": "miami_2026",
+      "championshipId": "f1_2026",
+      "raceName": "Formula 1 Crypto.com Miami Grand Prix 2026",
+      "schedule": {
+        "race": {
+          "date": "2026-05-03",
+          "time": "20:00:00Z"
+        },
+        "qualy": {
+          "date": "2026-05-02",
+          "time": "20:00:00Z"
+        },
+        "fp1": {
+          "date": "2026-05-01",
+          "time": "16:30:00Z"
+        },
+        "fp2": {
+          "date": null,
+          "time": null
+        },
+        "fp3": {
+          "date": null,
+          "time": null
+        },
+        "sprintQualy": {
+          "date": "2026-05-01",
+          "time": "20:30:00Z"
+        },
+        "sprintRace": {
+          "date": "2026-05-02",
+          "time": "16:00:00Z"
+        }
+      },
+      "laps": 57,
+      "round": 6,
+      "url": "https://en.wikipedia.org/wiki/Miami_Grand_Prix",
+      "fast_lap": {
+        "fast_lap": null,
+        "fast_lap_driver_id": null,
+        "fast_lap_team_id": null
+      },
+      "circuit": {
+        "circuitId": "miami",
+        "circuitName": "Miami International Autodrome",
+        "country": "United States",
+        "city": "Miami",
+        "circuitLength": "5412km",
+        "lapRecord": "1:29:708",
+        "firstParticipationYear": 2022,
+        "corners": 19,
+        "fastestLapDriverId": "max_verstappen",
+        "fastestLapTeamId": "red_bull",
+        "fastestLapYear": 2023,
+        "url": "https://en.wikipedia.org/wiki/Miami_International_Autodrome"
+      },
+      "winner": null,
+      "teamWinner": null
+    },
+    {
+      "raceId": "canadian_2026",
+      "championshipId": "f1_2026",
+      "raceName": "Formula 1 Lenovo Grand Prix Du Canada 2026",
+      "schedule": {
+        "race": {
+          "date": "2026-05-24",
+          "time": "18:00:00Z"
+        },
+        "qualy": {
+          "date": "2026-05-23",
+          "time": "20:00:00Z"
+        },
+        "fp1": {
+          "date": "2026-05-22",
+          "time": "17:30:00Z"
+        },
+        "fp2": {
+          "date": null,
+          "time": null
+        },
+        "fp3": {
+          "date": null,
+          "time": null
+        },
+        "sprintQualy": {
+          "date": "2026-05-22",
+          "time": "21:00:00Z"
+        },
+        "sprintRace": {
+          "date": "2026-05-23",
+          "time": "16:30:00Z"
+        }
+      },
+      "laps": 70,
+      "round": 7,
+      "url": "https://en.wikipedia.org/wiki/2026_Canadian_Grand_Prix",
+      "fast_lap": {
+        "fast_lap": null,
+        "fast_lap_driver_id": null,
+        "fast_lap_team_id": null
+      },
+      "circuit": {
+        "circuitId": "gilles_villeneuve",
+        "circuitName": "Circuit Gilles Villeneuve",
+        "country": "Canada",
+        "city": "Montreal",
+        "circuitLength": "4361km",
+        "lapRecord": "1:13:078",
+        "firstParticipationYear": 1978,
+        "corners": 14,
+        "fastestLapDriverId": "bottas",
+        "fastestLapTeamId": "mercedes",
+        "fastestLapYear": 2019,
+        "url": "https://en.wikipedia.org/wiki/Circuit_Gilles_Villeneuve"
+      },
+      "winner": null,
+      "teamWinner": null
+    },
+    {
+      "raceId": "monaco_2026",
+      "championshipId": "f1_2026",
+      "raceName": "Formula 1 Louis Vuitton Grand Prix de Monaco 2026",
+      "schedule": {
+        "race": {
+          "date": "2026-06-07",
+          "time": "13:00:00Z"
+        },
+        "qualy": {
+          "date": "2026-06-06",
+          "time": "14:00:00Z"
+        },
+        "fp1": {
+          "date": "2026-06-05",
+          "time": "11:30:00Z"
+        },
+        "fp2": {
+          "date": "2026-06-05",
+          "time": "15:00:00Z"
+        },
+        "fp3": {
+          "date": "2026-06-06",
+          "time": "10:30:00Z"
+        },
+        "sprintQualy": {
+          "date": null,
+          "time": null
+        },
+        "sprintRace": {
+          "date": null,
+          "time": null
+        }
+      },
+      "laps": 78,
+      "round": 8,
+      "url": "https://en.wikipedia.org/wiki/2026_Monaco_Grand_Prix",
+      "fast_lap": {
+        "fast_lap": null,
+        "fast_lap_driver_id": null,
+        "fast_lap_team_id": null
+      },
+      "circuit": {
+        "circuitId": "monaco",
+        "circuitName": "Circuit de Monaco",
+        "country": "Monaco",
+        "city": "Monte Carlo",
+        "circuitLength": "3337km",
+        "lapRecord": "1:12:909",
+        "firstParticipationYear": 1950,
+        "corners": 19,
+        "fastestLapDriverId": "hamilton",
+        "fastestLapTeamId": "mercedes",
+        "fastestLapYear": 2021,
+        "url": "https://en.wikipedia.org/wiki/Circuit_de_Monaco"
+      },
+      "winner": null,
+      "teamWinner": null
+    },
+    {
+      "raceId": "barcelona_catalunya_2026",
+      "championshipId": "f1_2026",
+      "raceName": "Formula 1 MSC Cruises Gran Premio de Barcelona-Catalunya 2026",
+      "schedule": {
+        "race": {
+          "date": "2026-06-14",
+          "time": "13:00:00Z"
+        },
+        "qualy": {
+          "date": "2026-06-13",
+          "time": "14:00:00Z"
+        },
+        "fp1": {
+          "date": "2026-06-12",
+          "time": "11:30:00Z"
+        },
+        "fp2": {
+          "date": "2026-06-12",
+          "time": "15:00:00Z"
+        },
+        "fp3": {
+          "date": "2026-06-13",
+          "time": "10:30:00Z"
+        },
+        "sprintQualy": {
+          "date": null,
+          "time": null
+        },
+        "sprintRace": {
+          "date": null,
+          "time": null
+        }
+      },
+      "laps": 66,
+      "round": 9,
+      "url": "https://en.wikipedia.org/wiki/2026_Spanish_Grand_Prix",
+      "fast_lap": {
+        "fast_lap": null,
+        "fast_lap_driver_id": null,
+        "fast_lap_team_id": null
+      },
+      "circuit": {
+        "circuitId": "montmelo",
+        "circuitName": "Circuit de Barcelona-Catalunya",
+        "country": "Spain",
+        "city": "Barcelona",
+        "circuitLength": "4657km",
+        "lapRecord": "1:16:330",
+        "firstParticipationYear": 1991,
+        "corners": 14,
+        "fastestLapDriverId": "max_verstappen",
+        "fastestLapTeamId": "red_bull",
+        "fastestLapYear": 2023,
+        "url": "https://en.wikipedia.org/wiki/Circuit_de_Barcelona-Catalunya"
+      },
+      "winner": null,
+      "teamWinner": null
+    },
+    {
+      "raceId": "austrian_2026",
+      "championshipId": "f1_2026",
+      "raceName": "Formula 1 Lenovo Austrian Grand Prix 2026",
+      "schedule": {
+        "race": {
+          "date": "2026-06-28",
+          "time": "13:00:00Z"
+        },
+        "qualy": {
+          "date": "2026-06-27",
+          "time": "14:00:00Z"
+        },
+        "fp1": {
+          "date": "2026-06-26",
+          "time": "11:30:00Z"
+        },
+        "fp2": {
+          "date": "2026-06-26",
+          "time": "15:00:00Z"
+        },
+        "fp3": {
+          "date": "2026-06-27",
+          "time": "10:30:00Z"
+        },
+        "sprintQualy": {
+          "date": null,
+          "time": null
+        },
+        "sprintRace": {
+          "date": null,
+          "time": null
+        }
+      },
+      "laps": 71,
+      "round": 10,
+      "url": "https://en.wikipedia.org/wiki/2026_Austrian_Grand_Prix",
+      "fast_lap": {
+        "fast_lap": null,
+        "fast_lap_driver_id": null,
+        "fast_lap_team_id": null
+      },
+      "circuit": {
+        "circuitId": "red_bull_ring",
+        "circuitName": "Red Bull Ring",
+        "country": "Austria",
+        "city": "Spielberg",
+        "circuitLength": "4318km",
+        "lapRecord": "1:05:619",
+        "firstParticipationYear": 1970,
+        "corners": 10,
+        "fastestLapDriverId": "sainz",
+        "fastestLapTeamId": "mclaren",
+        "fastestLapYear": 2020,
+        "url": "https://en.wikipedia.org/wiki/Red_Bull_Ring"
+      },
+      "winner": null,
+      "teamWinner": null
+    },
+    {
+      "raceId": "british_2026",
+      "championshipId": "f1_2026",
+      "raceName": "Formula 1 Pirelli British Grand Prix 2026",
+      "schedule": {
+        "race": {
+          "date": "2026-07-05",
+          "time": "14:00:00Z"
+        },
+        "qualy": {
+          "date": "2026-07-04",
+          "time": "14:00:00Z"
+        },
+        "fp1": {
+          "date": "2026-07-03",
+          "time": null
+        },
+        "fp2": {
+          "date": null,
+          "time": null
+        },
+        "fp3": {
+          "date": null,
+          "time": null
+        },
+        "sprintQualy": {
+          "date": "2026-07-03",
+          "time": "11:30:00Z"
+        },
+        "sprintRace": {
+          "date": "2026-07-04",
+          "time": "10:30:00Z"
+        }
+      },
+      "laps": 52,
+      "round": 11,
+      "url": "https://en.wikipedia.org/wiki/2026_British_Grand_Prix",
+      "fast_lap": {
+        "fast_lap": null,
+        "fast_lap_driver_id": null,
+        "fast_lap_team_id": null
+      },
+      "circuit": {
+        "circuitId": "silverstone",
+        "circuitName": "Silverstone Circuit",
+        "country": "Great Britain",
+        "city": "Silverstone",
+        "circuitLength": "5891km",
+        "lapRecord": "1:27:097",
+        "firstParticipationYear": 1950,
+        "corners": 18,
+        "fastestLapDriverId": "max_verstappen",
+        "fastestLapTeamId": "red_bull",
+        "fastestLapYear": 2020,
+        "url": "https://en.wikipedia.org/wiki/Silverstone_Circuit"
+      },
+      "winner": null,
+      "teamWinner": null
+    },
+    {
+      "raceId": "belgian_2026",
+      "championshipId": "f1_2026",
+      "raceName": "Formula 1 Belgian Grand Prix 2026",
+      "schedule": {
+        "race": {
+          "date": "2026-07-19",
+          "time": "13:00:00Z"
+        },
+        "qualy": {
+          "date": "2026-07-18",
+          "time": "14:00:00Z"
+        },
+        "fp1": {
+          "date": "2026-07-17",
+          "time": "10:30:00Z"
+        },
+        "fp2": {
+          "date": "2026-07-17",
+          "time": "14:30:00Z"
+        },
+        "fp3": {
+          "date": "2026-07-18",
+          "time": "10:00:00Z"
+        },
+        "sprintQualy": {
+          "date": null,
+          "time": null
+        },
+        "sprintRace": {
+          "date": null,
+          "time": null
+        }
+      },
+      "laps": 44,
+      "round": 12,
+      "url": "https://en.wikipedia.org/wiki/2026_Belgian_Grand_Prix",
+      "fast_lap": {
+        "fast_lap": null,
+        "fast_lap_driver_id": null,
+        "fast_lap_team_id": null
+      },
+      "circuit": {
+        "circuitId": "spa",
+        "circuitName": "Circuit de Spa-Francorchamps",
+        "country": "Belgium",
+        "city": "Stavelot",
+        "circuitLength": "7004km",
+        "lapRecord": "1:46:286",
+        "firstParticipationYear": 1950,
+        "corners": 20,
+        "fastestLapDriverId": "bottas",
+        "fastestLapTeamId": "mercedes",
+        "fastestLapYear": 2018,
+        "url": "https://en.wikipedia.org/wiki/Circuit_de_Spa-Francorchamps"
+      },
+      "winner": null,
+      "teamWinner": null
+    },
+    {
+      "raceId": "hungarian_2026",
+      "championshipId": "f1_2026",
+      "raceName": "Formula 1 AWS Hungarian Grand Prix 2026",
+      "schedule": {
+        "race": {
+          "date": "2026-07-26",
+          "time": "13:00:00Z"
+        },
+        "qualy": {
+          "date": "2026-07-25",
+          "time": "14:00:00Z"
+        },
+        "fp1": {
+          "date": "2026-07-24",
+          "time": "11:30:00Z"
+        },
+        "fp2": {
+          "date": "2026-07-24",
+          "time": "15:00:00Z"
+        },
+        "fp3": {
+          "date": "2026-07-25",
+          "time": "10:30:00Z"
+        },
+        "sprintQualy": {
+          "date": null,
+          "time": null
+        },
+        "sprintRace": {
+          "date": null,
+          "time": null
+        }
+      },
+      "laps": 70,
+      "round": 13,
+      "url": "https://en.wikipedia.org/wiki/2026_Hungarian_Grand_Prix",
+      "fast_lap": {
+        "fast_lap": null,
+        "fast_lap_driver_id": null,
+        "fast_lap_team_id": null
+      },
+      "circuit": {
+        "circuitId": "hungaroring",
+        "circuitName": "Hungaroring",
+        "country": "Hungary",
+        "city": "Mogyorod",
+        "circuitLength": "4381km",
+        "lapRecord": "1:16:627",
+        "firstParticipationYear": 1986,
+        "corners": 14,
+        "fastestLapDriverId": "hamilton",
+        "fastestLapTeamId": "mercedes",
+        "fastestLapYear": 2020,
+        "url": "https://en.wikipedia.org/wiki/Hungaroring"
+      },
+      "winner": null,
+      "teamWinner": null
+    },
+    {
+      "raceId": "dutch_2026",
+      "championshipId": "f1_2026",
+      "raceName": "Formula 1 Heineken Dutch Grand Prix 2026",
+      "schedule": {
+        "race": {
+          "date": "2026-08-23",
+          "time": "13:00:00Z"
+        },
+        "qualy": {
+          "date": "2026-08-22",
+          "time": "13:00:00Z"
+        },
+        "fp1": {
+          "date": "2026-08-21",
+          "time": "10:30:00Z"
+        },
+        "fp2": {
+          "date": null,
+          "time": null
+        },
+        "fp3": {
+          "date": null,
+          "time": null
+        },
+        "sprintQualy": {
+          "date": "2026-08-21",
+          "time": "14:00:00Z"
+        },
+        "sprintRace": {
+          "date": "2026-08-22",
+          "time": "09:30:00Z"
+        }
+      },
+      "laps": 72,
+      "round": 14,
+      "url": "https://en.wikipedia.org/wiki/2026_Dutch_Grand_Prix",
+      "fast_lap": {
+        "fast_lap": null,
+        "fast_lap_driver_id": null,
+        "fast_lap_team_id": null
+      },
+      "circuit": {
+        "circuitId": "zandvoort",
+        "circuitName": "Circuit Zandvoort",
+        "country": "Netherlands",
+        "city": "Zandvoort",
+        "circuitLength": "4259km",
+        "lapRecord": "1:11:097",
+        "firstParticipationYear": 1950,
+        "corners": 14,
+        "fastestLapDriverId": "hamilton",
+        "fastestLapTeamId": "mercedes",
+        "fastestLapYear": 2021,
+        "url": "https://en.wikipedia.org/wiki/Circuit_Zandvoort"
+      },
+      "winner": null,
+      "teamWinner": null
+    },
+    {
+      "raceId": "italian_2026",
+      "championshipId": "f1_2026",
+      "raceName": "Formula 1 Pirelli Gran D'Italia 2026",
+      "schedule": {
+        "race": {
+          "date": "2026-09-06",
+          "time": "13:00:00Z"
+        },
+        "qualy": {
+          "date": "2026-09-05",
+          "time": "13:00:00Z"
+        },
+        "fp1": {
+          "date": "2026-09-04",
+          "time": "11:30:00Z"
+        },
+        "fp2": {
+          "date": "2026-09-04",
+          "time": "15:00:00Z"
+        },
+        "fp3": {
+          "date": "2026-09-05",
+          "time": "10:30:00Z"
+        },
+        "sprintQualy": {
+          "date": null,
+          "time": null
+        },
+        "sprintRace": {
+          "date": null,
+          "time": null
+        }
+      },
+      "laps": 53,
+      "round": 15,
+      "url": "https://en.wikipedia.org/wiki/2026_Italian_Grand_Prix",
+      "fast_lap": {
+        "fast_lap": null,
+        "fast_lap_driver_id": null,
+        "fast_lap_team_id": null
+      },
+      "circuit": {
+        "circuitId": "monza",
+        "circuitName": "Autodromo Nazionale Monza",
+        "country": "Italy",
+        "city": "Monza",
+        "circuitLength": "5793km",
+        "lapRecord": "1:21:046",
+        "firstParticipationYear": 1950,
+        "corners": 11,
+        "fastestLapDriverId": "barrichelo",
+        "fastestLapTeamId": "ferrari",
+        "fastestLapYear": 2004,
+        "url": "https://en.wikipedia.org/wiki/Monza_Circuit"
+      },
+      "winner": null,
+      "teamWinner": null
+    },
+    {
+      "raceId": "spanish_2026",
+      "championshipId": "f1_2026",
+      "raceName": "Formula 1 Tag Heuer Gran Premio de España 2026",
+      "schedule": {
+        "race": {
+          "date": "2026-09-13",
+          "time": "13:00:00Z"
+        },
+        "qualy": {
+          "date": "2026-09-12",
+          "time": "14:00:00Z"
+        },
+        "fp1": {
+          "date": "2026-09-11",
+          "time": "11:30:00Z"
+        },
+        "fp2": {
+          "date": "2026-09-11",
+          "time": "15:00:00Z"
+        },
+        "fp3": {
+          "date": "2026-09-12",
+          "time": "10:30:00Z"
+        },
+        "sprintQualy": {
+          "date": null,
+          "time": null
+        },
+        "sprintRace": {
+          "date": null,
+          "time": null
+        }
+      },
+      "laps": null,
+      "round": 16,
+      "url": "https://en.wikipedia.org/wiki/2026_Spanish_Grand_Prix",
+      "fast_lap": {
+        "fast_lap": null,
+        "fast_lap_driver_id": null,
+        "fast_lap_team_id": null
+      },
+      "circuit": {
+        "circuitId": "madring",
+        "circuitName": "Circuito de Madring",
+        "country": "Spain",
+        "city": "Madrid",
+        "circuitLength": "5474km",
+        "lapRecord": null,
+        "firstParticipationYear": 2026,
+        "corners": 22,
+        "fastestLapDriverId": null,
+        "fastestLapTeamId": null,
+        "fastestLapYear": null,
+        "url": "https://en.wikipedia.org/wiki/Madring"
+      },
+      "winner": null,
+      "teamWinner": null
+    },
+    {
+      "raceId": "azerbaijan_2026",
+      "championshipId": "f1_2026",
+      "raceName": "Formula 1 Qatar Airways Azerbaijan Grand Prix 2026",
+      "schedule": {
+        "race": {
+          "date": "2026-09-26",
+          "time": "11:00:00Z"
+        },
+        "qualy": {
+          "date": "2026-09-25",
+          "time": "12:00:00Z"
+        },
+        "fp1": {
+          "date": "2026-09-24",
+          "time": "08:30:00Z"
+        },
+        "fp2": {
+          "date": "2026-09-24",
+          "time": "12:00:00Z"
+        },
+        "fp3": {
+          "date": "2026-09-25",
+          "time": "08:30:00Z"
+        },
+        "sprintQualy": {
+          "date": null,
+          "time": null
+        },
+        "sprintRace": {
+          "date": null,
+          "time": null
+        }
+      },
+      "laps": 51,
+      "round": 17,
+      "url": "https://en.wikipedia.org/wiki/2026_Azerbaijan_Grand_Prix",
+      "fast_lap": {
+        "fast_lap": null,
+        "fast_lap_driver_id": null,
+        "fast_lap_team_id": null
+      },
+      "circuit": {
+        "circuitId": "baku",
+        "circuitName": "Baku City Circuit",
+        "country": "Azerbaijan",
+        "city": "Baku",
+        "circuitLength": "6003km",
+        "lapRecord": "1:43:009",
+        "firstParticipationYear": 2017,
+        "corners": 20,
+        "fastestLapDriverId": "leclerc",
+        "fastestLapTeamId": "ferrari",
+        "fastestLapYear": 2019,
+        "url": "https://en.wikipedia.org/wiki/Baku_City_Circuit"
+      },
+      "winner": null,
+      "teamWinner": null
+    },
+    {
+      "raceId": "singapore_2026",
+      "championshipId": "f1_2026",
+      "raceName": "Formula 1 Singapore Airlanes Singapore Grand Prix 2026",
+      "schedule": {
+        "race": {
+          "date": "2026-10-11",
+          "time": "12:00:00Z"
+        },
+        "qualy": {
+          "date": "2026-10-10",
+          "time": "13:00:00Z"
+        },
+        "fp1": {
+          "date": "2026-10-09",
+          "time": "09:30:00Z"
+        },
+        "fp2": {
+          "date": "2026-10-09",
+          "time": "13:00:00Z"
+        },
+        "fp3": {
+          "date": "2026-10-10",
+          "time": "09:30:00Z"
+        },
+        "sprintQualy": {
+          "date": null,
+          "time": null
+        },
+        "sprintRace": {
+          "date": null,
+          "time": null
+        }
+      },
+      "laps": 62,
+      "round": 18,
+      "url": "https://en.wikipedia.org/wiki/2026_Singapore_Grand_Prix",
+      "fast_lap": {
+        "fast_lap": null,
+        "fast_lap_driver_id": null,
+        "fast_lap_team_id": null
+      },
+      "circuit": {
+        "circuitId": "marina_bay",
+        "circuitName": "Marina Bay Street Circuit",
+        "country": "Singapore",
+        "city": "Singapore",
+        "circuitLength": "4940km",
+        "lapRecord": "1:35:867",
+        "firstParticipationYear": 2008,
+        "corners": 19,
+        "fastestLapDriverId": "hamilton",
+        "fastestLapTeamId": "mercedes",
+        "fastestLapYear": 2023,
+        "url": "https://en.wikipedia.org/wiki/Marina_Bay_Street_Circuit"
+      },
+      "winner": null,
+      "teamWinner": null
+    },
+    {
+      "raceId": "united_states_2026",
+      "championshipId": "f1_2026",
+      "raceName": "Formula 1 MSC Cruises United States Grand Prix 2026",
+      "schedule": {
+        "race": {
+          "date": "2026-10-25",
+          "time": "19:00:00Z"
+        },
+        "qualy": {
+          "date": "2026-10-24",
+          "time": "21:00:00Z"
+        },
+        "fp1": {
+          "date": "2026-10-23",
+          "time": "17:30:00Z"
+        },
+        "fp2": {
+          "date": "2026-10-23",
+          "time": "21:30:00Z"
+        },
+        "fp3": {
+          "date": "2026-10-24",
+          "time": "17:00:00Z"
+        },
+        "sprintQualy": {
+          "date": null,
+          "time": null
+        },
+        "sprintRace": {
+          "date": null,
+          "time": null
+        }
+      },
+      "laps": 56,
+      "round": 19,
+      "url": "https://en.wikipedia.org/wiki/2026_United_States_Grand_Prix",
+      "fast_lap": {
+        "fast_lap": null,
+        "fast_lap_driver_id": null,
+        "fast_lap_team_id": null
+      },
+      "circuit": {
+        "circuitId": "austin",
+        "circuitName": "Circuit of The Americas",
+        "country": "United States",
+        "city": "Austin",
+        "circuitLength": "3426km",
+        "lapRecord": "1:36:169",
+        "firstParticipationYear": 2012,
+        "corners": 20,
+        "fastestLapDriverId": "leclerc",
+        "fastestLapTeamId": "ferrari",
+        "fastestLapYear": 2019,
+        "url": "https://en.wikipedia.org/wiki/Circuit_of_the_Americas"
+      },
+      "winner": null,
+      "teamWinner": null
+    },
+    {
+      "raceId": "mexican_2026",
+      "championshipId": "f1_2026",
+      "raceName": "Formula 1 Gran Premio de La Ciudad de México 2026",
+      "schedule": {
+        "race": {
+          "date": "2026-11-01",
+          "time": "20:00:00Z"
+        },
+        "qualy": {
+          "date": "2026-10-31",
+          "time": "21:00:00Z"
+        },
+        "fp1": {
+          "date": "2026-10-30",
+          "time": "18:30:00Z"
+        },
+        "fp2": {
+          "date": "2026-10-30",
+          "time": "22:00:00Z"
+        },
+        "fp3": {
+          "date": "2026-10-31",
+          "time": "17:30:00Z"
+        },
+        "sprintQualy": {
+          "date": null,
+          "time": null
+        },
+        "sprintRace": {
+          "date": null,
+          "time": null
+        }
+      },
+      "laps": 71,
+      "round": 20,
+      "url": "https://en.wikipedia.org/wiki/2026_Mexican_Grand_Prix",
+      "fast_lap": {
+        "fast_lap": null,
+        "fast_lap_driver_id": null,
+        "fast_lap_team_id": null
+      },
+      "circuit": {
+        "circuitId": "hermanos_rodriguez",
+        "circuitName": "Autódromo Hermanos Rodríguez",
+        "country": "Mexico",
+        "city": "Mexico City",
+        "circuitLength": "4304km",
+        "lapRecord": "1:17:774",
+        "firstParticipationYear": 1962,
+        "corners": 17,
+        "fastestLapDriverId": "bottas",
+        "fastestLapTeamId": "mercedes",
+        "fastestLapYear": 2021,
+        "url": "https://en.wikipedia.org/wiki/Aut%C3%B3dromo_Hermanos_Rodr%C3%ADguez"
+      },
+      "winner": null,
+      "teamWinner": null
+    },
+    {
+      "raceId": "brazilian_2026",
+      "championshipId": "f1_2026",
+      "raceName": "Formula 1 MSC Cruises Grande Premio de Sao Paulo 2026",
+      "schedule": {
+        "race": {
+          "date": "2026-11-08",
+          "time": "17:00:00Z"
+        },
+        "qualy": {
+          "date": "2026-11-07",
+          "time": "18:00:00Z"
+        },
+        "fp1": {
+          "date": "2026-11-06",
+          "time": "14:30:00Z"
+        },
+        "fp2": {
+          "date": "2026-11-06",
+          "time": "18:30:00Z"
+        },
+        "fp3": {
+          "date": "2026-11-07",
+          "time": "14:00:00Z"
+        },
+        "sprintQualy": {
+          "date": null,
+          "time": null
+        },
+        "sprintRace": {
+          "date": null,
+          "time": null
+        }
+      },
+      "laps": 71,
+      "round": 21,
+      "url": "https://en.wikipedia.org/wiki/2026_Brazilian_Grand_Prix",
+      "fast_lap": {
+        "fast_lap": null,
+        "fast_lap_driver_id": null,
+        "fast_lap_team_id": null
+      },
+      "circuit": {
+        "circuitId": "interlagos",
+        "circuitName": "Autodromo José Carlos Pace | Interlagos",
+        "country": "Brazil",
+        "city": "Sao Paulo",
+        "circuitLength": "4309km",
+        "lapRecord": "1:10:540",
+        "firstParticipationYear": 1972,
+        "corners": 15,
+        "fastestLapDriverId": "bottas",
+        "fastestLapTeamId": "mercedes",
+        "fastestLapYear": 2018,
+        "url": "https://en.wikipedia.org/wiki/Interlagos_Circuit"
+      },
+      "winner": null,
+      "teamWinner": null
+    },
+    {
+      "raceId": "las_vegas_2026",
+      "championshipId": "f1_2026",
+      "raceName": "Formula 1 Heineken Las Vegas Grand Prix 2026",
+      "schedule": {
+        "race": {
+          "date": "2026-11-22",
+          "time": "04:00:00Z"
+        },
+        "qualy": {
+          "date": "2026-11-21",
+          "time": "04:00:00Z"
+        },
+        "fp1": {
+          "date": "2026-11-20",
+          "time": "00:30:00Z"
+        },
+        "fp2": {
+          "date": "2026-11-20",
+          "time": "04:00:00Z"
+        },
+        "fp3": {
+          "date": "2026-11-21",
+          "time": "00:30:00Z"
+        },
+        "sprintQualy": {
+          "date": null,
+          "time": null
+        },
+        "sprintRace": {
+          "date": null,
+          "time": null
+        }
+      },
+      "laps": 50,
+      "round": 22,
+      "url": "https://en.wikipedia.org/wiki/2026_Las_Vegas_Grand_Prix",
+      "fast_lap": {
+        "fast_lap": null,
+        "fast_lap_driver_id": null,
+        "fast_lap_team_id": null
+      },
+      "circuit": {
+        "circuitId": "vegas",
+        "circuitName": "Las Vegas Strip Circuit",
+        "country": "United States",
+        "city": "Las Vegas",
+        "circuitLength": "3853km",
+        "lapRecord": "1:35:490",
+        "firstParticipationYear": 2023,
+        "corners": 17,
+        "fastestLapDriverId": "piastri",
+        "fastestLapTeamId": "mclaren",
+        "fastestLapYear": 2023,
+        "url": "https://en.wikipedia.org/wiki/Las_Vegas_Strip_Circuit"
+      },
+      "winner": null,
+      "teamWinner": null
+    },
+    {
+      "raceId": "qatar_2026",
+      "championshipId": "f1_2026",
+      "raceName": "Formula 1 Qatar Airways Qatar Grand Prix 2026",
+      "schedule": {
+        "race": {
+          "date": "2026-11-29",
+          "time": "16:00:00Z"
+        },
+        "qualy": {
+          "date": "2026-11-28",
+          "time": "18:00:00Z"
+        },
+        "fp1": {
+          "date": "2026-11-27",
+          "time": "13:30:00Z"
+        },
+        "fp2": {
+          "date": "2026-11-27",
+          "time": "17:30:00Z"
+        },
+        "fp3": {
+          "date": "2026-11-28",
+          "time": "14:00:00Z"
+        },
+        "sprintQualy": {
+          "date": null,
+          "time": null
+        },
+        "sprintRace": {
+          "date": null,
+          "time": null
+        }
+      },
+      "laps": 57,
+      "round": 23,
+      "url": "https://en.wikipedia.org/wiki/2026_Qatar_Grand_Prix",
+      "fast_lap": {
+        "fast_lap": null,
+        "fast_lap_driver_id": null,
+        "fast_lap_team_id": null
+      },
+      "circuit": {
+        "circuitId": "lusail",
+        "circuitName": "Lusail International Circuit",
+        "country": "Qatar",
+        "city": "Lusail",
+        "circuitLength": "5419km",
+        "lapRecord": "1:24:319",
+        "firstParticipationYear": 2021,
+        "corners": 16,
+        "fastestLapDriverId": "max_verstappen",
+        "fastestLapTeamId": "red_bull",
+        "fastestLapYear": 2023,
+        "url": "https://en.wikipedia.org/wiki/Lusail_International_Circuit"
+      },
+      "winner": null,
+      "teamWinner": null
+    },
+    {
+      "raceId": "abu_dhabi_2026",
+      "championshipId": "f1_2026",
+      "raceName": "Formula 1 Etihad Airways Abu Dhabi Grand Prix 2026",
+      "schedule": {
+        "race": {
+          "date": "2026-12-06",
+          "time": "13:00:00Z"
+        },
+        "qualy": {
+          "date": "2026-12-05",
+          "time": "14:00:00Z"
+        },
+        "fp1": {
+          "date": "2026-12-04",
+          "time": "09:30:00Z"
+        },
+        "fp2": {
+          "date": "2026-12-04",
+          "time": "13:00:00Z"
+        },
+        "fp3": {
+          "date": "2026-12-05",
+          "time": "10:30:00Z"
+        },
+        "sprintQualy": {
+          "date": null,
+          "time": null
+        },
+        "sprintRace": {
+          "date": null,
+          "time": null
+        }
+      },
+      "laps": 58,
+      "round": 24,
+      "url": "https://en.wikipedia.org/wiki/2026_Abu_Dhabi_Grand_Prix",
+      "fast_lap": {
+        "fast_lap": null,
+        "fast_lap_driver_id": null,
+        "fast_lap_team_id": null
+      },
+      "circuit": {
+        "circuitId": "yas_marina",
+        "circuitName": "Yas Marina Circuit",
+        "country": "United Arab Emirates",
+        "city": "Abu Dhabi",
+        "circuitLength": "5281km",
+        "lapRecord": "1:26:103",
+        "firstParticipationYear": 2009,
+        "corners": 16,
+        "fastestLapDriverId": "max_verstappen",
+        "fastestLapTeamId": "red_bull",
+        "fastestLapYear": 2021,
+        "url": "https://en.wikipedia.org/wiki/Yas_Marina_Circuit"
+      },
+      "winner": null,
+      "teamWinner": null
+    }
+  ]
+}
