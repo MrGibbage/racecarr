@@ -1,0 +1,32 @@
+[project]
+name = "racecarr-backend"
+version = "0.1.0"
+description = "Racecarr backend service (FastAPI)"
+readme = "../README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi==0.110.0",
+    "uvicorn[standard]==0.27.0",
+    "SQLAlchemy==2.0.25",
+    "alembic==1.13.1",
+    "pydantic==2.6.1",
+    "pydantic-settings==2.1.0",
+    "httpx==0.27.0",
+    "apscheduler==3.10.4",
+    "python-dotenv==1.0.1",
+    "loguru==0.7.2"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "anyio>=4.2.0"
+]
+
+[build-system]
+requires = ["setuptools>=69.0.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv]
+# Keep uv from attempting to build a wheel for the app; treat as application.
+package = false

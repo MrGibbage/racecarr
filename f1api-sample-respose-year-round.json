@@ -1,0 +1,91 @@
+{
+  "api": "https://f1api.dev",
+  "url": "https://f1api.dev/api/2025/24",
+  "total": 1,
+  "season": 2025,
+  "round": "24",
+  "championship": {
+    "championshipId": "f1_2025",
+    "championshipName": "2025 Formula 1 World Championship",
+    "url": "https://en.wikipedia.org/wiki/2025_Formula_One_World_Championship",
+    "year": 2025
+  },
+  "race": [
+    {
+      "raceId": "abu_dhabi_2025",
+      "championshipId": "f1_2025",
+      "raceName": "Etihad Airways Abu Dhabi Grand Prix 2025",
+      "schedule": {
+        "race": {
+          "date": "2025-12-07",
+          "time": "13:00:00Z"
+        },
+        "qualy": {
+          "date": "2025-12-06",
+          "time": "14:00:00Z"
+        },
+        "fp1": {
+          "date": "2025-12-05",
+          "time": "09:30:00Z"
+        },
+        "fp2": {
+          "date": "2025-12-05",
+          "time": "13:00:00Z"
+        },
+        "fp3": {
+          "date": "2025-12-06",
+          "time": "10:30:00Z"
+        },
+        "sprintQualy": {
+          "date": null,
+          "time": null
+        },
+        "sprintRace": {
+          "date": null,
+          "time": null
+        }
+      },
+      "laps": 58,
+      "round": 24,
+      "url": "https://en.wikipedia.org/wiki/2025_Abu_Dhabi_Grand_Prix",
+      "fast_lap": {
+        "fast_lap": "1:26.725",
+        "fast_lap_driver_id": "leclerc",
+        "fast_lap_team_id": "ferrari"
+      },
+      "circuit": {
+        "circuitId": "yas_marina",
+        "circuitName": "Yas Marina Circuit",
+        "country": "United Arab Emirates",
+        "city": "Abu Dhabi",
+        "circuitLength": "5281km",
+        "lapRecord": "1:26:103",
+        "firstParticipationYear": 2009,
+        "corners": 16,
+        "fastestLapDriverId": "max_verstappen",
+        "fastestLapTeamId": "red_bull",
+        "fastestLapYear": 2021,
+        "url": "https://en.wikipedia.org/wiki/Yas_Marina_Circuit"
+      },
+      "winner": {
+        "driverId": "max_verstappen",
+        "name": "Max",
+        "surname": "Verstappen",
+        "country": "Netherlands",
+        "birthday": "1997-09-30",
+        "number": 33,
+        "shortName": "VER",
+        "url": "https://en.wikipedia.org/wiki/Max_Verstappen"
+      },
+      "teamWinner": {
+        "teamId": "red_bull",
+        "teamName": "Red Bull Racing",
+        "country": "Austria",
+        "firstAppearance": 2005,
+        "constructorsChampionships": 6,
+        "driversChampionships": 8,
+        "url": "https://en.wikipedia.org/wiki/Red_Bull_Racing"
+      }
+    }
+  ]
+}
