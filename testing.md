@@ -1,31 +1,26 @@
 ## Testing Checklist
 
+> Status note: Unchecked items are future work per the design doc unless noted as completed.
+
 ### Pre-reqs
 - [x] Python 3.12 installed
 - [x] Docker Desktop running
 - [x] Repo cloned
 
-### Backend setup (local)
-- [x] From backend: `uv sync --python "C:\Python312\python.exe"`
-- [x] Run dev server with reload: `uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
+### Local dev setup
+- [x] Backend: from `backend` run `uv sync --python "C:\Python312\python.exe"`
+- [x] Backend: run `uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
+- [x] Frontend: from `frontend` run `npm install` (first time), then `npm run dev -- --host --port 5173`
 
-### Health checks
+### API smoke (local 8000)
 - [x] GET http://localhost:8000/api/healthz → {"status":"ok"}
 - [x] GET http://localhost:8000/api/readyz → {"status":"ready"}
-
-### Seed & data checks
 - [x] POST/GET http://localhost:8000/api/demo-seasons → three seasons (2026, 2025, 2024)
 - [x] GET http://localhost:8000/api/seasons → lists seasons (count 3)
-
-### Search demo
 - [x] GET http://localhost:8000/api/search-demo → returns 3 mock rows
-
-### Logs API
-- [x] Hit health/seasons/search to generate entries
 - [x] GET http://localhost:8000/api/logs → last 50 JSON log entries visible
 
-### Frontend (dev)
-- [x] From frontend: `npm install` (first time), then `npm run dev -- --host --port 5173`
+### Frontend (local dev)
 - [x] Dashboard: shows 3 season cards; “Seed demo seasons” works; “Refresh” reloads list
 - [x] Search: shows 3 demo results table; “Refresh demo results” reloads
 - [x] Logs: shows last log entries table (timestamp/level/message)
@@ -36,10 +31,10 @@
 - [ ] Log level setting persists and changes verbosity
 - [ ] About/version displays current build
 
-### Docker end-to-end
+### Docker end-to-end (container on 8080)
 - [ ] From repo root: `docker compose up --build`
-- [ ] App served at http://localhost:8000/ (frontend static)
-- [ ] API at http://localhost:8000/api/... (healthz/readyz/seasons/search-demo/logs)
+- [ ] App served at http://localhost:8080/
+- [ ] API at http://localhost:8080/api/... (healthz/readyz/seasons/search-demo/logs)
 - [ ] Navigate UI (Dashboard/Search/Logs) and confirm data renders
 
 ### Indexers & Search (real integrations)
