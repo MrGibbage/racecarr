@@ -18,8 +18,12 @@ type LogEntry = {
   message: string;
 };
 
-const API_BASE =
-  import.meta.env.VITE_API_URL ?? `${window.location.origin}/api`;
+const API_BASE = (() => {
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+  const origin = window.location.origin;
+  if (origin.includes("8080")) return `${origin}/api`;
+  return "http://localhost:8000/api";
+})();
 
 export function Logs() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
