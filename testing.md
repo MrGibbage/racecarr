@@ -16,14 +16,19 @@
 - [x] GET http://localhost:8000/api/healthz → {"status":"ok"}
 - [x] GET http://localhost:8000/api/readyz → {"status":"ready"}
 - [x] POST/GET http://localhost:8000/api/demo-seasons → three seasons (2026, 2025, 2024)
+- [x] POST http://localhost:8000/api/seasons/{year}/refresh → fetches rounds/events from f1api.dev
 - [x] GET http://localhost:8000/api/seasons → lists seasons (count 3)
 - [x] GET http://localhost:8000/api/search-demo → returns 3 mock rows
 - [x] GET http://localhost:8000/api/logs → last 50 JSON log entries visible
+- [ ] GET/POST http://localhost:8000/api/indexers → list/create indexers
+- [ ] PUT/DELETE http://localhost:8000/api/indexers/{id} → update/remove
+- [ ] POST http://localhost:8000/api/indexers/{id}/test → connectivity check (caps)
 
 ### Frontend (local dev)
 - [x] Dashboard: shows 3 season cards; “Seed demo seasons” works; “Refresh” reloads list
 - [x] Search: shows 3 demo results table; “Refresh demo results” reloads
 - [x] Logs: shows last log entries table (timestamp/level/message)
+> Note: frontend calls `VITE_API_URL` if provided, otherwise `http://localhost:8000/api`.
 
 ### Settings / Auth
 - [ ] Single-password auth: login flow, password change, session idle timeout

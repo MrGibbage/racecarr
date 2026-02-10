@@ -16,15 +16,19 @@ npm install
 npm run dev -- --host --port 5173
 ```
 
-Backend listens on 8000 in dev. Frontend dev server runs on 5173 and calls the API at `/api`.
+Backend listens on 8000 in dev. Frontend dev server runs on 5173; API base resolves to `VITE_API_URL` when set, otherwise falls back to `http://localhost:8000/api`.
 
 ## API
 - `GET /api/healthz`
 - `GET /api/readyz`
 - `GET /api/seasons`
  - `POST/GET /api/demo-seasons`
+- `POST /api/seasons/{year}/refresh`
  - `GET /api/search-demo`
  - `GET /api/logs`
+ - `GET/POST /api/indexers`
+ - `PUT/DELETE /api/indexers/{id}`
+ - `POST /api/indexers/{id}/test`
 
 ## Frontend
 Vite + React + Mantine. Pages: Dashboard, Search, Settings, Logs. Proxy to backend on `/api` during `npm run dev`.

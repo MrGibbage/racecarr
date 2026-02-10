@@ -54,6 +54,8 @@ Shows at-a-glance information:
   - Track local time  
   - UTC  
 - Past events show podium results (from f1api.dev)
+- When not using demo data, default season list to current year and previous year; user can configure a start year to limit how far back seasons are loaded (API goes to 1950)
+ - UI time display supports a user-selectable time zone override (defaults to browser local) alongside UTC; track-local shown when available
 
 ## 2.4 Event Detail Screen  
 - All metadata for the round  

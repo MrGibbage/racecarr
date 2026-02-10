@@ -3,14 +3,27 @@ from collections import deque
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable
+from sqlalchemy.orm import selectinload
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import text, select
 from sqlalchemy.orm import Session
 from ..core.database import get_session
 from ..core.config import get_settings
 from ..core.logging_config import log_response
-from ..schemas.common import HealthStatus, SeasonOut, SearchResult, LogEntry
-from ..models.entities import Season
+from ..schemas.common import (
+    HealthStatus,
+    SeasonOut,
+    SeasonDetail,
+    SearchResult,
+    LogEntry,
+    IndexerCreate,
+    IndexerUpdate,
+    IndexerOut,
+    IndexerTestResult,
+)
+from ..models.entities import Season, Round, Indexer
+from ..services.f1api import refresh_season
+from ..services.indexer_client import test_indexer_connection
 
 router = APIRouter()
 
@@ -29,15 +42,20 @@ def readyz(session: Session = Depends(get_session)) -> HealthStatus:
     return HealthStatus(status="ready")
 
 
-@router.get("/seasons", response_model=list[SeasonOut])
-def list_seasons(session: Session = Depends(get_session)) -> list[SeasonOut]:
-    seasons = session.query(Season).order_by(Season.year.desc()).all()
+@router.get("/seasons", response_model=list[SeasonDetail])
+def list_seasons(session: Session = Depends(get_session)) -> list[SeasonDetail]:
+    seasons = (
+        session.query(Season)
+        .options(selectinload(Season.rounds).selectinload(Round.events))
+        .order_by(Season.year.desc())
+        .all()
+    )
     log_response("list_seasons", count=len(seasons))
     return seasons
 
 
-@router.api_route("/demo-seasons", methods=["POST", "GET"], response_model=list[SeasonOut])
-def seed_demo_seasons(session: Session = Depends(get_session)) -> list[SeasonOut]:
+@router.api_route("/demo-seasons", methods=["POST", "GET"], response_model=list[SeasonDetail])
+def seed_demo_seasons(session: Session = Depends(get_session)) -> list[SeasonDetail]:
     """Insert three example seasons if they don't already exist."""
     existing_years = {row.year for row in session.execute(select(Season.year)).all()}
     current_year = datetime.utcnow().year
@@ -54,8 +72,18 @@ def seed_demo_seasons(session: Session = Depends(get_session)) -> list[SeasonOut
     session.commit()
     log_response("seed_demo_seasons", inserted=len(new_seasons), total=len(existing_years) + len(new_seasons))
     # Return all seasons sorted desc
-    return session.query(Season).order_by(Season.year.desc()).all()
+    return (
+        session.query(Season)
+        .options(selectinload(Season.rounds).selectinload(Round.events))
+        .order_by(Season.year.desc())
+        .all()
+    )
 
+@router.post("/seasons/{year}/refresh", response_model=SeasonDetail)
+def refresh_season_data(year: int, session: Session = Depends(get_session)) -> SeasonDetail:
+    season = refresh_season(session, year)
+    log_response("refresh_season", year=year, rounds=len(season.rounds))
+    return season
 
 @router.get("/search-demo", response_model=list[SearchResult])
 def search_demo() -> list[SearchResult]:
@@ -108,3 +136,70 @@ def recent_logs() -> list[LogEntry]:
             continue
     log_response("recent_logs", count=len(entries))
     return entries
+
+
+@router.get("/indexers", response_model=list[IndexerOut])
+def list_indexers(session: Session = Depends(get_session)) -> list[IndexerOut]:
+    rows = session.query(Indexer).order_by(Indexer.name.asc()).all()
+    log_response("list_indexers", count=len(rows))
+    return rows
+
+
+@router.post("/indexers", response_model=IndexerOut, status_code=status.HTTP_201_CREATED)
+def create_indexer(payload: IndexerCreate, session: Session = Depends(get_session)) -> IndexerOut:
+    item = Indexer(
+        name=payload.name,
+        api_url=payload.api_url,
+        api_key=payload.api_key,
+        category=payload.category,
+        enabled=payload.enabled,
+    )
+    session.add(item)
+    session.commit()
+    session.refresh(item)
+    log_response("create_indexer", id=item.id)
+    return item
+
+
+@router.put("/indexers/{indexer_id}", response_model=IndexerOut)
+def update_indexer(indexer_id: int, payload: IndexerUpdate, session: Session = Depends(get_session)) -> IndexerOut:
+    item: Indexer | None = session.query(Indexer).filter_by(id=indexer_id).first()
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Indexer not found")
+
+    if payload.name is not None:
+        item.name = payload.name
+    if payload.api_url is not None:
+        item.api_url = payload.api_url
+    if payload.api_key is not None:
+        item.api_key = payload.api_key
+    if payload.category is not None:
+        item.category = payload.category
+    if payload.enabled is not None:
+        item.enabled = payload.enabled
+
+    session.commit()
+    session.refresh(item)
+    log_response("update_indexer", id=item.id)
+    return item
+
+
+@router.delete("/indexers/{indexer_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_indexer(indexer_id: int, session: Session = Depends(get_session)) -> None:
+    item: Indexer | None = session.query(Indexer).filter_by(id=indexer_id).first()
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Indexer not found")
+    session.delete(item)
+    session.commit()
+    log_response("delete_indexer", id=indexer_id)
+    return None
+
+
+@router.post("/indexers/{indexer_id}/test", response_model=IndexerTestResult)
+def test_indexer(indexer_id: int, session: Session = Depends(get_session)) -> IndexerTestResult:
+    item: Indexer | None = session.query(Indexer).filter_by(id=indexer_id).first()
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Indexer not found")
+    ok, message = test_indexer_connection(item)
+    log_response("test_indexer", id=indexer_id, ok=ok)
+    return IndexerTestResult(ok=ok, message=message)
