@@ -12,6 +12,7 @@ DEFAULT_LOG_PATH = BASE_DIR / "config" / "app.log"
 
 class Settings(BaseSettings):
     app_name: str = "Racecarr"
+    app_version: str = Field("0.1.0", validation_alias="APP_VERSION")
     env: str = Field("development", validation_alias="ENV")
     api_prefix: str = "/api"
     log_level: str = Field("INFO", validation_alias="LOG_LEVEL")

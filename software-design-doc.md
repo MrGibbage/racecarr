@@ -156,6 +156,7 @@ Tabs include:
   - Apprise endpoints; which events trigger; test endpoint.  
 - **Logging & Support**  
   - Log level (API `/settings/log-level`); retention days/size cap; download support bundle (redacted logs/version).  
+  - About/version surface via `/settings/about` with backend dependency versions and GitHub link.  
 - **Time & Locale**  
   - Timezone override (else browser); track-local display toggle; date/time formats.  
 - **Security & Auth**  

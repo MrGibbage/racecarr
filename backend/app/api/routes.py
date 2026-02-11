@@ -1,4 +1,6 @@
 import json
+import sys
+import importlib.metadata
 from collections import deque
 from datetime import datetime
 from pathlib import Path
@@ -32,6 +34,8 @@ from ..schemas.common import (
     AuthChangePasswordRequest,
     LogLevelRequest,
     LogLevelResponse,
+    AboutResponse,
+    DependencyVersion,
 )
 from ..models.entities import Season, Round, Indexer, Downloader
 from ..services.f1api import refresh_season
@@ -161,6 +165,43 @@ def update_log_level(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     log_response("log_level_updated", level=cfg.log_level)
     return LogLevelResponse(log_level=cfg.log_level)
+
+
+def _gather_dependencies() -> list[DependencyVersion]:
+    packages = [
+        "fastapi",
+        "uvicorn",
+        "SQLAlchemy",
+        "alembic",
+        "pydantic",
+        "httpx",
+        "apscheduler",
+        "loguru",
+        "passlib",
+        "itsdangerous",
+    ]
+    deps: list[DependencyVersion] = []
+    for pkg in packages:
+        try:
+            version = importlib.metadata.version(pkg)
+        except importlib.metadata.PackageNotFoundError:
+            version = "unknown"
+        deps.append(DependencyVersion(name=pkg, version=version))
+    return deps
+
+
+@router.get("/settings/about", response_model=AboutResponse)
+def about(auth: AuthSession = Depends(require_auth)) -> AboutResponse:
+    settings = get_settings()
+    dependencies = _gather_dependencies()
+    python_version = sys.version.split(" ")[0]
+    return AboutResponse(
+        app_name=settings.app_name,
+        app_version=settings.app_version,
+        python_version=python_version,
+        dependencies=dependencies,
+        github_url="https://github.com/MrGibbage/racecarr",
+    )
 
 
 @router.get("/seasons", response_model=list[SeasonDetail])

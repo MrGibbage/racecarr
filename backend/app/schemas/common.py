@@ -172,3 +172,16 @@ class LogLevelRequest(BaseModel):
 
 class LogLevelResponse(BaseModel):
     log_level: str
+
+
+class DependencyVersion(BaseModel):
+    name: str
+    version: str
+
+
+class AboutResponse(BaseModel):
+    app_name: str
+    app_version: str
+    python_version: str
+    dependencies: list[DependencyVersion] = Field(default_factory=list)
+    github_url: str | None = None
