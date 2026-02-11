@@ -65,7 +65,7 @@ export function Logs() {
             <Loader />
           </Group>
         ) : (
-          <ScrollArea h={400} type="hover">
+          <ScrollArea h="calc(100vh - 220px)" type="hover">
             <Table striped highlightOnHover withColumnBorders stickyHeader>
               <Table.Thead>
                 <Table.Tr>
