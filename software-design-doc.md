@@ -159,7 +159,7 @@ Tabs include:
 - **Time & Locale**  
   - Timezone override (else browser); track-local display toggle; date/time formats.  
 - **Security & Auth**  
-  - Change password (bcrypt); session idle timeout; remember-me duration.  
+  - Change password (bcrypt); session idle timeout; remember-me duration. Implemented with FastAPI `/auth/login|logout|me|password` endpoints issuing an httpOnly `rc_session` cookie (remember-me extends expiry; idle timeout refreshed on requests).  
 - **UI**  
   - Theme (light/dark/system); table density; calendar color options.  
 - **About/Updates**  

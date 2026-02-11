@@ -11,19 +11,13 @@ import {
   Text,
   Title,
 } from "@mantine/core";
+import { apiFetch } from "../api";
 
 type LogEntry = {
   timestamp: string;
   level: string;
   message: string;
 };
-
-const API_BASE = (() => {
-  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
-  const origin = window.location.origin;
-  if (origin.includes("8080")) return `${origin}/api`;
-  return "http://localhost:8000/api";
-})();
 
 export function Logs() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -34,7 +28,7 @@ export function Logs() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/logs`);
+      const res = await apiFetch(`/logs`);
       if (!res.ok) throw new Error(`Failed to load logs (${res.status})`);
       const data = (await res.json()) as LogEntry[];
       setLogs(data);
