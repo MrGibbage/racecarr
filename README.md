@@ -1,5 +1,9 @@
 # Racecarr
 
+![Version](https://img.shields.io/badge/version-0.1.0-blue)
+![Python](https://img.shields.io/badge/python-3.12+-blue)
+![Frontend](https://img.shields.io/badge/frontend-Vite%2FReact%2FMantine-00b894)
+
 Skeleton implementation of the Racecarr app per the design doc.
 
 ## Quick start (dev)
