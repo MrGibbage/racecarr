@@ -2,6 +2,7 @@ import json
 import sys
 import importlib.metadata
 import json as jsonlib
+import subprocess
 from collections import deque
 from datetime import datetime
 from pathlib import Path
@@ -54,6 +55,8 @@ from ..services.auth import (
 from ..services.app_config import get_app_config, set_log_level
 
 router = APIRouter()
+
+SERVER_STARTED_AT = datetime.utcnow().isoformat() + "Z"
 
 
 COOKIE_NAME = "rc_session"
@@ -209,12 +212,27 @@ def _gather_frontend_dependencies() -> list[DependencyVersion]:
     return deps
 
 
+def _get_git_sha() -> str:
+    try:
+        result = subprocess.run([
+            "git",
+            "-C",
+            str(BASE_DIR),
+            "rev-parse",
+            "HEAD",
+        ], capture_output=True, text=True, check=True)
+        return result.stdout.strip()
+    except Exception:
+        return "unknown"
+
+
 @router.get("/settings/about", response_model=AboutResponse)
 def about(auth: AuthSession = Depends(require_auth)) -> AboutResponse:
     settings = get_settings()
     backend_dependencies = _gather_backend_dependencies()
     frontend_dependencies = _gather_frontend_dependencies()
     python_version = sys.version.split(" ")[0]
+    git_sha = _get_git_sha()
     return AboutResponse(
         app_name=settings.app_name,
         app_version=settings.app_version,
@@ -222,6 +240,8 @@ def about(auth: AuthSession = Depends(require_auth)) -> AboutResponse:
         backend_dependencies=backend_dependencies,
         frontend_dependencies=frontend_dependencies,
         github_url="https://github.com/MrGibbage/racecarr",
+        git_sha=git_sha,
+        server_started_at=SERVER_STARTED_AT,
     )
 
 

@@ -186,3 +186,5 @@ class AboutResponse(BaseModel):
     backend_dependencies: list[DependencyVersion] = Field(default_factory=list)
     frontend_dependencies: list[DependencyVersion] = Field(default_factory=list)
     github_url: str | None = None
+    git_sha: str | None = None
+    server_started_at: str | None = None
