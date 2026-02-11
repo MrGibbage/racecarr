@@ -72,6 +72,8 @@ type AboutResponse = {
   github_url?: string;
   backend_dependencies: DependencyVersion[];
   frontend_dependencies: DependencyVersion[];
+  git_sha?: string;
+  server_started_at?: string;
 };
 
 const stopKeyProp = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -884,6 +886,12 @@ export function Settings() {
               <Text fw={600}>{about.app_name}</Text>
               <Badge variant="light">v{about.app_version}</Badge>
               <Badge variant="outline" color="gray">Python {about.python_version}</Badge>
+              {about.git_sha && (
+                <Badge variant="outline" color="blue">Git {about.git_sha.slice(0, 7)}</Badge>
+              )}
+              {about.server_started_at && (
+                <Badge variant="outline" color="teal">Started {about.server_started_at}</Badge>
+              )}
               {about.github_url && (
                 <a href={about.github_url} target="_blank" rel="noreferrer">
                   GitHub
