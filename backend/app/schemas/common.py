@@ -183,5 +183,6 @@ class AboutResponse(BaseModel):
     app_name: str
     app_version: str
     python_version: str
-    dependencies: list[DependencyVersion] = Field(default_factory=list)
+    backend_dependencies: list[DependencyVersion] = Field(default_factory=list)
+    frontend_dependencies: list[DependencyVersion] = Field(default_factory=list)
     github_url: str | None = None

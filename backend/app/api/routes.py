@@ -1,6 +1,7 @@
 import json
 import sys
 import importlib.metadata
+import json as jsonlib
 from collections import deque
 from datetime import datetime
 from pathlib import Path
@@ -10,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from sqlalchemy import text, select
 from sqlalchemy.orm import Session
 from ..core.database import get_session
-from ..core.config import get_settings
+from ..core.config import get_settings, BASE_DIR
 from ..core.logging_config import log_response
 from ..schemas.common import (
     HealthStatus,
@@ -167,7 +168,7 @@ def update_log_level(
     return LogLevelResponse(log_level=cfg.log_level)
 
 
-def _gather_dependencies() -> list[DependencyVersion]:
+def _gather_backend_dependencies() -> list[DependencyVersion]:
     packages = [
         "fastapi",
         "uvicorn",
@@ -190,16 +191,36 @@ def _gather_dependencies() -> list[DependencyVersion]:
     return deps
 
 
+def _gather_frontend_dependencies() -> list[DependencyVersion]:
+    pkg_path = BASE_DIR / "frontend" / "package.json"
+    if not pkg_path.exists():
+        return []
+    try:
+        with pkg_path.open("r", encoding="utf-8") as f:
+            pkg = jsonlib.load(f)
+    except Exception:
+        return []
+
+    deps: list[DependencyVersion] = []
+    data = pkg.get("dependencies", {}) | pkg.get("devDependencies", {})
+    for name in ["react", "react-dom", "@mantine/core", "@mantine/hooks", "@tabler/icons-react", "vite", "typescript"]:
+        version = data.get(name, "unknown")
+        deps.append(DependencyVersion(name=name, version=version))
+    return deps
+
+
 @router.get("/settings/about", response_model=AboutResponse)
 def about(auth: AuthSession = Depends(require_auth)) -> AboutResponse:
     settings = get_settings()
-    dependencies = _gather_dependencies()
+    backend_dependencies = _gather_backend_dependencies()
+    frontend_dependencies = _gather_frontend_dependencies()
     python_version = sys.version.split(" ")[0]
     return AboutResponse(
         app_name=settings.app_name,
         app_version=settings.app_version,
         python_version=python_version,
-        dependencies=dependencies,
+        backend_dependencies=backend_dependencies,
+        frontend_dependencies=frontend_dependencies,
         github_url="https://github.com/MrGibbage/racecarr",
     )
 
