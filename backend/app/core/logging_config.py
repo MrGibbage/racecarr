@@ -4,13 +4,14 @@ from loguru import logger
 from .config import get_settings
 
 
-def configure_logging() -> None:
+def configure_logging(level: str | None = None) -> None:
     settings = get_settings()
     settings.log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_level = (level or settings.log_level).upper()
     logger.remove()
     logger.add(
         sys.stdout,
-        level=settings.log_level,
+        level=log_level,
         serialize=True,
         backtrace=False,
         diagnose=False,
@@ -18,7 +19,7 @@ def configure_logging() -> None:
     )
     logger.add(
         settings.log_path,
-        level=settings.log_level,
+        level=log_level,
         serialize=True,
         backtrace=False,
         diagnose=False,

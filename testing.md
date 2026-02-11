@@ -32,8 +32,7 @@
 
 ### Settings / Auth
 - [x] Single-password auth: login flow, password change, session idle timeout (remember-me + logout)
-- [ ] General settings: time zone override applies to displayed event times
-- [ ] Log level setting persists and changes verbosity
+- [x] Log level setting persists and changes verbosity
 - [ ] About/version displays current build
 
 ### Docker end-to-end (container on 8080)

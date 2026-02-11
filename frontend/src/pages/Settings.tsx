@@ -56,6 +56,10 @@ type DownloaderPayload = {
   enabled: boolean;
 };
 
+type LogLevelResponse = {
+  log_level: string;
+};
+
 const stopKeyProp = (e: React.KeyboardEvent<HTMLInputElement>) => {
   e.stopPropagation();
   // @ts-expect-error: stopImmediatePropagation exists on the native event
@@ -155,6 +159,16 @@ export function Settings() {
   const [pwdConfirm, setPwdConfirm] = useState("");
   const [pwdSaving, setPwdSaving] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [logLevel, setLogLevel] = useState("INFO");
+  const [logLevelLoading, setLogLevelLoading] = useState(false);
+  const logLevels = [
+    { value: "TRACE", label: "Trace" },
+    { value: "DEBUG", label: "Debug" },
+    { value: "INFO", label: "Info" },
+    { value: "WARNING", label: "Warning" },
+    { value: "ERROR", label: "Error" },
+    { value: "CRITICAL", label: "Critical" },
+  ];
 
   useEffect(() => {
     document.addEventListener("keydown", blockNavigationKeys, true);
@@ -194,6 +208,7 @@ export function Settings() {
   useEffect(() => {
     loadIndexers();
     loadDownloaders();
+    loadLogLevel();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -421,6 +436,40 @@ export function Settings() {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setPwdSaving(false);
+    }
+  };
+
+  const loadLogLevel = async () => {
+    setLogLevelLoading(true);
+    setError(null);
+    try {
+      const res = await apiFetch(`/settings/log-level`);
+      if (!res.ok) throw new Error(`Failed to load log level (${res.status})`);
+      const data = (await res.json()) as LogLevelResponse;
+      setLogLevel(data.log_level);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setLogLevelLoading(false);
+    }
+  };
+
+  const saveLogLevel = async () => {
+    setLogLevelLoading(true);
+    setError(null);
+    try {
+      const res = await apiFetch(`/settings/log-level`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ log_level: logLevel }),
+      });
+      if (!res.ok) throw new Error(`Failed to update log level (${res.status})`);
+      const data = (await res.json()) as LogLevelResponse;
+      setLogLevel(data.log_level);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setLogLevelLoading(false);
     }
   };
 
@@ -771,6 +820,28 @@ export function Settings() {
           </Button>
           <Button type="button" variant="outline" color="red" onClick={logout} loading={loggingOut}>
             Log out
+          </Button>
+        </Group>
+      </Paper>
+
+      <Paper withBorder p="md">
+        <Title order={4} mb="sm">
+          Logging
+        </Title>
+        <Text size="sm" c="dimmed" mb="sm">
+          Choose the minimum log level for API and scheduler output. Changes apply immediately and persist.
+        </Text>
+        <Group gap="sm" align="flex-end" wrap="wrap">
+          <Select
+            label="Log level"
+            data={logLevels}
+            value={logLevel}
+            onChange={(val) => val && setLogLevel(val)}
+            maw={220}
+            disabled={logLevelLoading}
+          />
+          <Button type="button" onClick={saveLogLevel} loading={logLevelLoading}>
+            Save log level
           </Button>
         </Group>
       </Paper>

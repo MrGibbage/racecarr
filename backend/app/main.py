@@ -8,6 +8,7 @@ from .core.logging_config import configure_logging
 from .core.database import Base, engine, SessionLocal
 from .api.routes import router as api_router
 from .services.auth import ensure_auth_row
+from .services.app_config import ensure_app_config
 
 
 def _ensure_downloader_priority_column() -> None:
@@ -22,11 +23,12 @@ def _ensure_downloader_priority_column() -> None:
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    configure_logging()
     _ensure_downloader_priority_column()
     Base.metadata.create_all(bind=engine)
     with SessionLocal() as session:
         ensure_auth_row(session)
+        app_config = ensure_app_config(session)
+    configure_logging(app_config.log_level)
 
     app = FastAPI(title=settings.app_name)
     app.add_middleware(

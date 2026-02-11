@@ -60,3 +60,9 @@ class AuthConfig(Base):
     id = Column(Integer, primary_key=True)
     password_hash = Column(String, nullable=False)
     updated_at = Column(DateTime, nullable=True)
+
+
+class AppConfig(Base):
+    __tablename__ = "app_config"
+    id = Column(Integer, primary_key=True)
+    log_level = Column(String, nullable=False)

@@ -30,6 +30,8 @@ from ..schemas.common import (
     AuthLoginResponse,
     AuthMeResponse,
     AuthChangePasswordRequest,
+    LogLevelRequest,
+    LogLevelResponse,
 )
 from ..models.entities import Season, Round, Indexer, Downloader
 from ..services.f1api import refresh_season
@@ -44,6 +46,7 @@ from ..services.auth import (
     update_password,
     AuthSession,
 )
+from ..services.app_config import get_app_config, set_log_level
 
 router = APIRouter()
 
@@ -138,6 +141,26 @@ def change_password(
     update_password(session, payload.new_password)
     log_response("auth_change_password")
     return AuthLoginResponse(ok=True, message="Password updated")
+
+
+@router.get("/settings/log-level", response_model=LogLevelResponse)
+def get_log_level(auth: AuthSession = Depends(require_auth), session: Session = Depends(get_session)) -> LogLevelResponse:
+    cfg = get_app_config(session)
+    return LogLevelResponse(log_level=cfg.log_level)
+
+
+@router.post("/settings/log-level", response_model=LogLevelResponse)
+def update_log_level(
+    payload: LogLevelRequest,
+    auth: AuthSession = Depends(require_auth),
+    session: Session = Depends(get_session),
+) -> LogLevelResponse:
+    try:
+        cfg = set_log_level(session, payload.log_level)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    log_response("log_level_updated", level=cfg.log_level)
+    return LogLevelResponse(log_level=cfg.log_level)
 
 
 @router.get("/seasons", response_model=list[SeasonDetail])

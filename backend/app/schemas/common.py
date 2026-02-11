@@ -164,3 +164,11 @@ class AuthMeResponse(BaseModel):
 class AuthChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
+
+
+class LogLevelRequest(BaseModel):
+    log_level: str
+
+
+class LogLevelResponse(BaseModel):
+    log_level: str
