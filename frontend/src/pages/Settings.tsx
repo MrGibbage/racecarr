@@ -70,7 +70,8 @@ type AboutResponse = {
   app_version: string;
   python_version: string;
   github_url?: string;
-  dependencies: DependencyVersion[];
+  backend_dependencies: DependencyVersion[];
+  frontend_dependencies: DependencyVersion[];
 };
 
 const stopKeyProp = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -900,7 +901,26 @@ export function Settings() {
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {about.dependencies.map((dep) => (
+                {about.backend_dependencies.map((dep) => (
+                  <Table.Tr key={dep.name}>
+                    <Table.Td>{dep.name}</Table.Td>
+                    <Table.Td>{dep.version}</Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+            <Text size="sm" c="dimmed" mt="sm">
+              Frontend dependencies
+            </Text>
+            <Table striped withColumnBorders>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th w="40%">Library</Table.Th>
+                  <Table.Th>Version</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {about.frontend_dependencies.map((dep) => (
                   <Table.Tr key={dep.name}>
                     <Table.Td>{dep.name}</Table.Td>
                     <Table.Td>{dep.version}</Table.Td>
