@@ -60,6 +60,19 @@ type LogLevelResponse = {
   log_level: string;
 };
 
+type DependencyVersion = {
+  name: string;
+  version: string;
+};
+
+type AboutResponse = {
+  app_name: string;
+  app_version: string;
+  python_version: string;
+  github_url?: string;
+  dependencies: DependencyVersion[];
+};
+
 const stopKeyProp = (e: React.KeyboardEvent<HTMLInputElement>) => {
   e.stopPropagation();
   // @ts-expect-error: stopImmediatePropagation exists on the native event
@@ -161,6 +174,7 @@ export function Settings() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [logLevel, setLogLevel] = useState("INFO");
   const [logLevelLoading, setLogLevelLoading] = useState(false);
+  const [about, setAbout] = useState<AboutResponse | null>(null);
   const logLevels = [
     { value: "TRACE", label: "Trace" },
     { value: "DEBUG", label: "Debug" },
@@ -209,6 +223,7 @@ export function Settings() {
     loadIndexers();
     loadDownloaders();
     loadLogLevel();
+    loadAbout();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -470,6 +485,18 @@ export function Settings() {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setLogLevelLoading(false);
+    }
+  };
+
+  const loadAbout = async () => {
+    setError(null);
+    try {
+      const res = await apiFetch(`/settings/about`);
+      if (!res.ok) throw new Error(`Failed to load about info (${res.status})`);
+      const data = (await res.json()) as AboutResponse;
+      setAbout(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
     }
   };
 
@@ -844,6 +871,49 @@ export function Settings() {
             Save log level
           </Button>
         </Group>
+      </Paper>
+
+      <Paper withBorder p="md">
+        <Title order={4} mb="sm">
+          About
+        </Title>
+        {about ? (
+          <Stack gap="xs">
+            <Group gap="md" wrap="wrap">
+              <Text fw={600}>{about.app_name}</Text>
+              <Badge variant="light">v{about.app_version}</Badge>
+              <Badge variant="outline" color="gray">Python {about.python_version}</Badge>
+              {about.github_url && (
+                <a href={about.github_url} target="_blank" rel="noreferrer">
+                  GitHub
+                </a>
+              )}
+            </Group>
+            <Text size="sm" c="dimmed">
+              Backend dependencies
+            </Text>
+            <Table striped withColumnBorders>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th w="40%">Library</Table.Th>
+                  <Table.Th>Version</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {about.dependencies.map((dep) => (
+                  <Table.Tr key={dep.name}>
+                    <Table.Td>{dep.name}</Table.Td>
+                    <Table.Td>{dep.version}</Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </Stack>
+        ) : (
+          <Group justify="center">
+            <Loader size="sm" />
+          </Group>
+        )}
       </Paper>
 
       <Paper withBorder p="md">

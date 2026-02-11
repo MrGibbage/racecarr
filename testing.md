@@ -33,7 +33,7 @@
 ### Settings / Auth
 - [x] Single-password auth: login flow, password change, session idle timeout (remember-me + logout)
 - [x] Log level setting persists and changes verbosity
-- [ ] About/version displays current build
+- [x] About/version displays current build
 
 ### Docker end-to-end (container on 8080)
 - [ ] From repo root: `docker compose up --build`

@@ -31,6 +31,7 @@ Backend listens on 8000 in dev. Frontend dev server runs on 5173; API base resol
 - `GET /api/auth/me`
 - `POST /api/auth/password`
 - `GET/POST /api/settings/log-level`
+- `GET /api/settings/about`
 - `GET /api/seasons`
  - `POST/GET /api/demo-seasons`
 - `POST /api/seasons/{year}/refresh`
