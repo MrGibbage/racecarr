@@ -2,11 +2,14 @@ import { AppShell, Burger, Group, NavLink, ScrollArea } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { IconHome, IconSearch, IconSettings, IconListDetails } from "@tabler/icons-react";
 import { Link, Route, Routes, useLocation } from "react-router-dom";
+import { useEffect } from "react";
 import { Dashboard } from "./pages/Dashboard";
 import { Search } from "./pages/Search";
 import { Settings } from "./pages/Settings";
 import { Logs } from "./pages/Logs";
 import { NotFound } from "./pages/NotFound";
+import { Login } from "./pages/Login";
+import { apiFetch } from "./api";
 
 const navItems = [
   { label: "Dashboard", to: "/", icon: IconHome },
@@ -18,6 +21,20 @@ const navItems = [
 export default function App() {
   const [opened, { toggle, close }] = useDisclosure();
   const location = useLocation();
+
+  useEffect(() => {
+    if (location.pathname === "/login") return;
+    apiFetch(`/auth/me`).catch(() => {});
+  }, [location.pathname]);
+
+  if (location.pathname === "/login") {
+    return (
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="*" element={<Login />} />
+      </Routes>
+    );
+  }
 
   return (
     <AppShell

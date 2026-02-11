@@ -7,11 +7,13 @@ import {
   Loader,
   Paper,
   ScrollArea,
+  Select,
   Stack,
   Table,
   Text,
   Title,
 } from "@mantine/core";
+import { apiFetch } from "../api";
 
 type SearchResult = {
   title: string;
@@ -21,25 +23,26 @@ type SearchResult = {
   seeders: number;
   leechers: number;
   quality: string;
+  nzb_url?: string | null;
 };
 
-const API_BASE = (() => {
-  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
-  const origin = window.location.origin;
-  if (origin.includes("8080")) return `${origin}/api`;
-  return "http://localhost:8000/api";
-})();
+type Downloader = {
+  id: number;
+  name: string;
+};
 
 export function Search() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [downloaders, setDownloaders] = useState<Downloader[]>([]);
+  const [selectedDownloaderId, setSelectedDownloaderId] = useState<string | null>(null);
 
   const loadDemo = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/search-demo`);
+      const res = await apiFetch(`/search-demo`);
       if (!res.ok) throw new Error(`Search failed (${res.status})`);
       const data = (await res.json()) as SearchResult[];
       setResults(data);
@@ -50,18 +53,61 @@ export function Search() {
     }
   };
 
+  const loadDownloaders = async () => {
+    try {
+      const res = await apiFetch(`/downloaders`);
+      if (!res.ok) throw new Error(`Failed to load downloaders (${res.status})`);
+      const data = (await res.json()) as Downloader[];
+      setDownloaders(data);
+      if (!selectedDownloaderId && data.length) setSelectedDownloaderId(String(data[0].id));
+    } catch (err) {
+      /* ignore downloaders error for demo */
+    }
+  };
+
   useEffect(() => {
     loadDemo();
+    loadDownloaders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const sendToDownloader = async (row: SearchResult) => {
+    if (!selectedDownloaderId || !row.nzb_url) return;
+    const id = selectedDownloaderId;
+    try {
+      const res = await apiFetch(`/downloaders/${id}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nzb_url: row.nzb_url, title: row.title }),
+      });
+      if (!res.ok) throw new Error(`Send failed (${res.status})`);
+      const data = (await res.json()) as { ok: boolean; message: string };
+      alert(`${data.ok ? "Sent" : "Failed"}: ${data.message}`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Send failed");
+    }
+  };
 
   return (
     <Stack gap="md">
       <Group justify="space-between" align="center">
         <Title order={2}>Search</Title>
-        <Button variant="default" onClick={loadDemo} loading={loading}>
-          Refresh demo results
-        </Button>
+        <Group gap="sm">
+          {downloaders.length > 0 && (
+            <Select
+              label="Downloader"
+              data={downloaders.map((d) => ({ value: String(d.id), label: d.name }))}
+              value={selectedDownloaderId}
+              onChange={setSelectedDownloaderId}
+              placeholder="Select downloader"
+              maw={220}
+              withinPortal
+            />
+          )}
+          <Button variant="default" onClick={loadDemo} loading={loading}>
+            Refresh demo results
+          </Button>
+        </Group>
       </Group>
 
       {error && (
@@ -87,6 +133,7 @@ export function Search() {
                   <Table.Th ta="right">Age (days)</Table.Th>
                   <Table.Th ta="right">Seeders</Table.Th>
                   <Table.Th ta="right">Leechers</Table.Th>
+                  <Table.Th>Actions</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -103,6 +150,16 @@ export function Search() {
                     <Table.Td ta="right">{row.age_days}</Table.Td>
                     <Table.Td ta="right">{row.seeders.toLocaleString()}</Table.Td>
                     <Table.Td ta="right">{row.leechers.toLocaleString()}</Table.Td>
+                    <Table.Td>
+                      <Button
+                        size="xs"
+                        variant="light"
+                        onClick={() => sendToDownloader(row)}
+                        disabled={!row.nzb_url || !selectedDownloaderId}
+                      >
+                        Send
+                      </Button>
+                    </Table.Td>
                   </Table.Tr>
                 ))}
               </Table.Tbody>

@@ -18,9 +18,18 @@ npm run dev -- --host --port 5173
 
 Backend listens on 8000 in dev. Frontend dev server runs on 5173; API base resolves to `VITE_API_URL` when set, otherwise falls back to `http://localhost:8000/api`.
 
+## Authentication
+- Single-user password; default is seeded to `admin` on first start. Update it in Settings → Security.
+- Session cookie `rc_session` is httpOnly with remember-me and idle timeout refresh; login at `/login`.
+- Logout is available from Settings → Security (clears the cookie and returns to the login screen).
+
 ## API
 - `GET /api/healthz`
 - `GET /api/readyz`
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
+- `POST /api/auth/password`
 - `GET /api/seasons`
  - `POST/GET /api/demo-seasons`
 - `POST /api/seasons/{year}/refresh`

@@ -52,3 +52,11 @@ class Downloader(Base):
     api_key = Column(String, nullable=True)
     category = Column(String, nullable=True)
     enabled = Column(Boolean, default=True)
+    priority = Column(Integer, nullable=True)
+
+
+class AuthConfig(Base):
+    __tablename__ = "auth_config"
+    id = Column(Integer, primary_key=True)
+    password_hash = Column(String, nullable=False)
+    updated_at = Column(DateTime, nullable=True)

@@ -11,6 +11,7 @@ import {
   Text,
   Title,
 } from "@mantine/core";
+import { apiFetch } from "../api";
 
 type Event = {
   id?: number;
@@ -34,13 +35,6 @@ type Season = {
   last_refreshed: string | null;
   rounds: Round[];
 };
-
-const API_BASE = (() => {
-  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
-  const origin = window.location.origin;
-  if (origin.includes("8080")) return `${origin}/api`; // container/runtime
-  return "http://localhost:8000/api"; // local dev backend
-})();
 
 const utcFormatter = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
@@ -103,7 +97,7 @@ export function Dashboard() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/seasons`);
+      const res = await apiFetch(`/seasons`);
       if (!res.ok) throw new Error(`Failed to load seasons (${res.status})`);
       const data = (await res.json()) as Season[];
       setSeasons(data);
@@ -119,7 +113,7 @@ export function Dashboard() {
     setSeeding(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/demo-seasons`, { method: "POST" });
+      const res = await apiFetch(`/demo-seasons`, { method: "POST" });
       if (!res.ok) throw new Error(`Seed failed (${res.status})`);
       const data = (await res.json()) as Season[];
       setSeasons(data);
@@ -135,7 +129,7 @@ export function Dashboard() {
     setRefreshingYear(year);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/seasons/${year}/refresh`, { method: "POST" });
+      const res = await apiFetch(`/seasons/${year}/refresh`, { method: "POST" });
       if (!res.ok) throw new Error(`Refresh failed (${res.status})`);
       const refreshed = (await res.json()) as Season;
       setSeasons((prev) => {

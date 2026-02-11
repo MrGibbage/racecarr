@@ -56,6 +56,7 @@ class SearchResult(BaseModel):
     seeders: int
     leechers: int
     quality: str
+    nzb_url: str | None = None
 
 
 class LogEntry(BaseModel):
@@ -94,3 +95,72 @@ class IndexerOut(IndexerBase):
 class IndexerTestResult(BaseModel):
     ok: bool
     message: str
+
+
+class DownloaderBase(BaseModel):
+    name: str
+    type: str
+    api_url: str
+    api_key: str | None = None
+    category: str | None = None
+    priority: int | None = None
+    enabled: bool = True
+
+
+class DownloaderCreate(DownloaderBase):
+    pass
+
+
+class DownloaderUpdate(BaseModel):
+    name: str | None = None
+    type: str | None = None
+    api_url: str | None = None
+    api_key: str | None = None
+    category: str | None = None
+    priority: int | None = None
+    enabled: bool | None = None
+
+
+class DownloaderOut(DownloaderBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+
+class DownloaderTestResult(BaseModel):
+    ok: bool
+    message: str
+
+
+class DownloaderSendRequest(BaseModel):
+    nzb_url: str
+    title: str | None = None
+    category: str | None = None
+    priority: int | None = None
+
+
+class DownloaderSendResult(BaseModel):
+    ok: bool
+    message: str
+
+
+class AuthLoginRequest(BaseModel):
+    password: str
+    remember_me: bool = False
+
+
+class AuthLoginResponse(BaseModel):
+    ok: bool
+    message: str
+
+
+class AuthMeResponse(BaseModel):
+    authenticated: bool
+    expires_at: datetime | None = None
+    idle_timeout_minutes: int | None = None
+
+
+class AuthChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
