@@ -195,7 +195,8 @@ def _gather_backend_dependencies() -> list[DependencyVersion]:
 
 
 def _gather_frontend_dependencies() -> list[DependencyVersion]:
-    pkg_path = BASE_DIR / "frontend" / "package.json"
+    repo_root = BASE_DIR.parent
+    pkg_path = repo_root / "frontend" / "package.json"
     if not pkg_path.exists():
         return []
     try:
