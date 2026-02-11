@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   Badge,
@@ -38,6 +38,68 @@ const API_BASE = (() => {
   return "http://localhost:8000/api";
 })();
 
+const stopKeyProp = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  e.stopPropagation();
+  // @ts-expect-error: stopImmediatePropagation exists on the native event
+  e.nativeEvent.stopImmediatePropagation?.();
+};
+
+const handleControlledBackspace = (
+  e: React.KeyboardEvent<HTMLInputElement>,
+  current: string,
+  apply: (next: string) => void
+) => {
+  if (e.key !== "Backspace") return;
+  e.preventDefault();
+  e.stopPropagation();
+  // @ts-expect-error native method exists
+  e.nativeEvent.stopImmediatePropagation?.();
+  const input = e.currentTarget;
+  const start = input.selectionStart ?? current.length;
+  const end = input.selectionEnd ?? start;
+  if (start === 0 && end === 0) return;
+  const next = current.slice(0, start === end ? start - 1 : start) + current.slice(end);
+  apply(next);
+  const nextPos = Math.max(0, start === end ? start - 1 : start);
+  requestAnimationFrame(() => {
+    try {
+      input.setSelectionRange(nextPos, nextPos);
+    } catch (err) {
+      /* ignore selection errors */
+    }
+  });
+};
+
+const stopAllKeysCapture = (e: React.KeyboardEvent) => {
+  e.stopPropagation();
+  // @ts-expect-error native method exists
+  e.nativeEvent.stopImmediatePropagation?.();
+};
+
+const blockNavigationKeys = (event: KeyboardEvent) => {
+  const target = event.target as HTMLElement | null;
+  const tag = target?.tagName.toLowerCase();
+  const isEditable = target?.isContentEditable;
+  const inTextField = tag === "input" || tag === "textarea" || isEditable;
+
+  // Block refresh/navigation keys globally
+  const isRefresh = event.key === "F5" || ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "r");
+  if (isRefresh) {
+    event.preventDefault();
+    event.stopPropagation();
+    // @ts-expect-error native method exists
+    event.stopImmediatePropagation?.();
+    return;
+  }
+
+  if (event.key === "Backspace" && !inTextField) {
+    event.preventDefault();
+    event.stopPropagation();
+    // @ts-expect-error native method exists
+    event.stopImmediatePropagation?.();
+  }
+};
+
 export function Settings() {
   const [indexers, setIndexers] = useState<Indexer[]>([]);
   const [loading, setLoading] = useState(false);
@@ -55,6 +117,11 @@ export function Settings() {
   });
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editPayload, setEditPayload] = useState<IndexerPayload | null>(null);
+
+  useEffect(() => {
+    document.addEventListener("keydown", blockNavigationKeys, true);
+    return () => document.removeEventListener("keydown", blockNavigationKeys, true);
+  }, []);
 
   const loadIndexers = async () => {
     setLoading(true);
@@ -183,9 +250,13 @@ export function Settings() {
           {isEditing ? (
             <TextInput
               value={editPayload?.name || ""}
-              onChange={(e) => setEditPayload((prev) => (prev ? { ...prev, name: e.currentTarget.value } : prev))}
+              onChange={(e) => {
+                const val = e.currentTarget.value;
+                setEditPayload((prev) => (prev ? { ...prev, name: val } : prev));
+              }}
               placeholder="Name"
               size="xs"
+              onKeyDown={stopKeyProp}
             />
           ) : (
             ix.name
@@ -195,9 +266,13 @@ export function Settings() {
           {isEditing ? (
             <TextInput
               value={editPayload?.api_url || ""}
-              onChange={(e) => setEditPayload((prev) => (prev ? { ...prev, api_url: e.currentTarget.value } : prev))}
+              onChange={(e) => {
+                const val = e.currentTarget.value;
+                setEditPayload((prev) => (prev ? { ...prev, api_url: val } : prev));
+              }}
               placeholder="https://indexer.example"
               size="xs"
+              onKeyDown={stopKeyProp}
             />
           ) : (
             ix.api_url
@@ -207,9 +282,20 @@ export function Settings() {
           {isEditing ? (
             <TextInput
               value={editPayload?.api_key || ""}
-              onChange={(e) => setEditPayload((prev) => (prev ? { ...prev, api_key: e.currentTarget.value } : prev))}
+              onChange={(e) => {
+                const val = e.currentTarget.value;
+                setEditPayload((prev) => (prev ? { ...prev, api_key: val } : prev));
+              }}
               placeholder="API key"
               size="xs"
+              onKeyDown={(e) => {
+                stopKeyProp(e);
+                handleControlledBackspace(e, editPayload?.api_key || "", (next) =>
+                  setEditPayload((prev) => (prev ? { ...prev, api_key: next } : prev))
+                );
+              }}
+              autoComplete="off"
+              type="text"
             />
           ) : (
             ix.api_key ? "••••" : "(none)"
@@ -219,9 +305,13 @@ export function Settings() {
           {isEditing ? (
             <TextInput
               value={editPayload?.category || ""}
-              onChange={(e) => setEditPayload((prev) => (prev ? { ...prev, category: e.currentTarget.value } : prev))}
+              onChange={(e) => {
+                const val = e.currentTarget.value;
+                setEditPayload((prev) => (prev ? { ...prev, category: val } : prev));
+              }}
               placeholder="e.g. 5030"
               size="xs"
+              onKeyDown={stopKeyProp}
             />
           ) : (
             ix.category || "(none)"
@@ -245,19 +335,25 @@ export function Settings() {
           <Group gap="xs">
             {isEditing ? (
               <>
-                <Button size="xs" variant="filled" onClick={saveEdit} loading={savingId === ix.id}>
+                <Button size="xs" variant="filled" onClick={saveEdit} loading={savingId === ix.id} type="button">
                   Save
                 </Button>
-                <Button size="xs" variant="default" onClick={cancelEdit}>
+                <Button size="xs" variant="default" onClick={cancelEdit} type="button">
                   Cancel
                 </Button>
               </>
             ) : (
               <>
-                <Button size="xs" variant="default" onClick={() => startEdit(ix)}>
+                <Button size="xs" variant="default" onClick={() => startEdit(ix)} type="button">
                   Edit
                 </Button>
-                <Button size="xs" variant="light" onClick={() => testIndexer(ix.id)} loading={testingId === ix.id}>
+                <Button
+                  size="xs"
+                  variant="light"
+                  onClick={() => testIndexer(ix.id)}
+                  loading={testingId === ix.id}
+                  type="button"
+                >
                   Test
                 </Button>
               </>
@@ -268,6 +364,7 @@ export function Settings() {
               variant="subtle"
               onClick={() => deleteIndexer(ix.id)}
               loading={deletingId === ix.id}
+              type="button"
             >
               Delete
             </Button>
@@ -278,7 +375,7 @@ export function Settings() {
   };
 
   return (
-    <Stack gap="md">
+    <Stack gap="md" onKeyDownCapture={stopAllKeysCapture}>
       <Title order={2}>Settings</Title>
       {error && (
         <Alert color="red" title="Error" variant="light">
@@ -300,6 +397,7 @@ export function Settings() {
             placeholder="NZBGeek"
             value={newIndexer.name}
             onChange={(e) => setNewIndexer({ ...newIndexer, name: e.currentTarget.value })}
+            onKeyDown={stopKeyProp}
           />
           <TextInput
             label="API URL"
@@ -307,6 +405,7 @@ export function Settings() {
             value={newIndexer.api_url}
             onChange={(e) => setNewIndexer({ ...newIndexer, api_url: e.currentTarget.value })}
             maw={320}
+            onKeyDown={stopKeyProp}
           />
           <TextInput
             label="API Key"
@@ -314,6 +413,14 @@ export function Settings() {
             value={newIndexer.api_key || ""}
             onChange={(e) => setNewIndexer({ ...newIndexer, api_key: e.currentTarget.value })}
             maw={280}
+            onKeyDown={(e) => {
+              stopKeyProp(e);
+              handleControlledBackspace(e, newIndexer.api_key || "", (next) =>
+                setNewIndexer({ ...newIndexer, api_key: next })
+              );
+            }}
+            autoComplete="off"
+            type="text"
           />
           <TextInput
             label="Category"
@@ -321,13 +428,19 @@ export function Settings() {
             value={newIndexer.category || ""}
             onChange={(e) => setNewIndexer({ ...newIndexer, category: e.currentTarget.value })}
             maw={200}
+            onKeyDown={stopKeyProp}
           />
           <Switch
             label="Enabled"
             checked={newIndexer.enabled}
             onChange={(e) => setNewIndexer({ ...newIndexer, enabled: e.currentTarget.checked })}
           />
-          <Button onClick={createIndexer} loading={creating} disabled={!newIndexer.name || !newIndexer.api_url}>
+          <Button
+            type="button"
+            onClick={createIndexer}
+            loading={creating}
+            disabled={!newIndexer.name || !newIndexer.api_url}
+          >
             Add indexer
           </Button>
         </Group>
