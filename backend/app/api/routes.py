@@ -205,10 +205,15 @@ def _gather_frontend_dependencies() -> list[DependencyVersion]:
         return []
 
     deps: list[DependencyVersion] = []
-    data = pkg.get("dependencies", {}) | pkg.get("devDependencies", {})
-    for name in ["react", "react-dom", "@mantine/core", "@mantine/hooks", "@tabler/icons-react", "vite", "typescript"]:
-        version = data.get(name, "unknown")
-        deps.append(DependencyVersion(name=name, version=version))
+    merged: dict[str, str] = {}
+    merged.update(pkg.get("dependencies", {}) or {})
+    merged.update(pkg.get("devDependencies", {}) or {})
+
+    if not merged:
+        return deps
+
+    for name in sorted(merged.keys()):
+        deps.append(DependencyVersion(name=name, version=str(merged.get(name, "unknown"))))
     return deps
 
 

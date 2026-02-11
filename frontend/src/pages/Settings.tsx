@@ -928,12 +928,18 @@ export function Settings() {
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {about.frontend_dependencies.map((dep) => (
-                  <Table.Tr key={dep.name}>
-                    <Table.Td>{dep.name}</Table.Td>
-                    <Table.Td>{dep.version}</Table.Td>
+                {about.frontend_dependencies.length === 0 ? (
+                  <Table.Tr>
+                    <Table.Td colSpan={2}>No dependencies detected</Table.Td>
                   </Table.Tr>
-                ))}
+                ) : (
+                  about.frontend_dependencies.map((dep) => (
+                    <Table.Tr key={dep.name}>
+                      <Table.Td>{dep.name}</Table.Td>
+                      <Table.Td>{dep.version}</Table.Td>
+                    </Table.Tr>
+                  ))
+                )}
               </Table.Tbody>
             </Table>
           </Stack>
