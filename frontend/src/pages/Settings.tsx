@@ -15,7 +15,11 @@ import {
   TextInput,
   Title,
   PasswordInput,
+  Collapse,
+  ActionIcon,
+  Tooltip,
 } from "@mantine/core";
+import { IconCopy } from "@tabler/icons-react";
 import { apiFetch } from "../api";
 
 type Indexer = {
@@ -178,6 +182,7 @@ export function Settings() {
   const [logLevel, setLogLevel] = useState("INFO");
   const [logLevelLoading, setLogLevelLoading] = useState(false);
   const [about, setAbout] = useState<AboutResponse | null>(null);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const logLevels = [
     { value: "TRACE", label: "Trace" },
     { value: "DEBUG", label: "Debug" },
@@ -500,6 +505,35 @@ export function Settings() {
       setAbout(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
+    }
+  };
+
+  const copyAbout = async () => {
+    if (!about) return;
+    const lines: string[] = [];
+    lines.push(`${about.app_name} v${about.app_version}`);
+    lines.push(`Python: ${about.python_version}`);
+    if (about.git_sha) lines.push(`Git SHA: ${about.git_sha}`);
+    if (about.server_started_at) lines.push(`Started: ${about.server_started_at}`);
+    if (about.github_url) lines.push(`GitHub: ${about.github_url}`);
+    lines.push("");
+    lines.push("Backend dependencies:");
+    if (about.backend_dependencies.length === 0) {
+      lines.push("(none)");
+    } else {
+      about.backend_dependencies.forEach((dep) => lines.push(`- ${dep.name}: ${dep.version}`));
+    }
+    lines.push("");
+    lines.push("Frontend dependencies:");
+    if (about.frontend_dependencies.length === 0) {
+      lines.push("(none)");
+    } else {
+      about.frontend_dependencies.forEach((dep) => lines.push(`- ${dep.name}: ${dep.version}`));
+    }
+    try {
+      await navigator.clipboard.writeText(lines.join("\n"));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to copy");
     }
   };
 
@@ -877,72 +911,84 @@ export function Settings() {
       </Paper>
 
       <Paper withBorder p="md">
-        <Title order={4} mb="sm">
-          About
-        </Title>
+        <Group justify="space-between" align="center" mb="xs">
+          <Title order={4}>About</Title>
+          <Group gap="xs">
+            <Tooltip label="Copy about info" withArrow>
+              <ActionIcon variant="light" aria-label="Copy about info" onClick={copyAbout} disabled={!about}>
+                <IconCopy size={16} />
+              </ActionIcon>
+            </Tooltip>
+            <Button size="xs" variant="subtle" onClick={() => setAboutOpen((v) => !v)}>
+              {aboutOpen ? "Collapse" : "Expand"}
+            </Button>
+          </Group>
+        </Group>
         {about ? (
-          <Stack gap="xs">
-            <Group gap="md" wrap="wrap">
-              <Text fw={600}>{about.app_name}</Text>
-              <Badge variant="light">v{about.app_version}</Badge>
-              <Badge variant="outline" color="gray">Python {about.python_version}</Badge>
-              {about.git_sha && (
-                <Badge variant="outline" color="blue">Git {about.git_sha.slice(0, 7)}</Badge>
-              )}
-              {about.server_started_at && (
-                <Badge variant="outline" color="teal">Started {about.server_started_at}</Badge>
-              )}
-              {about.github_url && (
-                <a href={about.github_url} target="_blank" rel="noreferrer">
-                  GitHub
-                </a>
-              )}
-            </Group>
-            <Text size="sm" c="dimmed">
-              Backend dependencies
-            </Text>
-            <Table striped withColumnBorders>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th w="40%">Library</Table.Th>
-                  <Table.Th>Version</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {about.backend_dependencies.map((dep) => (
-                  <Table.Tr key={dep.name}>
-                    <Table.Td>{dep.name}</Table.Td>
-                    <Table.Td>{dep.version}</Table.Td>
-                  </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
-            <Text size="sm" c="dimmed" mt="sm">
-              Frontend dependencies
-            </Text>
-            <Table striped withColumnBorders>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th w="40%">Library</Table.Th>
-                  <Table.Th>Version</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {about.frontend_dependencies.length === 0 ? (
+          <Collapse in={aboutOpen}>
+            <Stack gap="xs">
+              <Group gap="md" wrap="wrap">
+                <Text fw={600}>{about.app_name}</Text>
+                <Badge variant="light">v{about.app_version}</Badge>
+                <Badge variant="outline" color="gray">Python {about.python_version}</Badge>
+                {about.git_sha && (
+                  <Badge variant="outline" color="blue">Git {about.git_sha.slice(0, 7)}</Badge>
+                )}
+                {about.server_started_at && (
+                  <Badge variant="outline" color="teal">Started {about.server_started_at}</Badge>
+                )}
+                {about.github_url && (
+                  <a href={about.github_url} target="_blank" rel="noreferrer">
+                    GitHub
+                  </a>
+                )}
+              </Group>
+              <Text size="sm" c="dimmed">
+                Backend dependencies
+              </Text>
+              <Table striped withColumnBorders>
+                <Table.Thead>
                   <Table.Tr>
-                    <Table.Td colSpan={2}>No dependencies detected</Table.Td>
+                    <Table.Th w="40%">Library</Table.Th>
+                    <Table.Th>Version</Table.Th>
                   </Table.Tr>
-                ) : (
-                  about.frontend_dependencies.map((dep) => (
+                </Table.Thead>
+                <Table.Tbody>
+                  {about.backend_dependencies.map((dep) => (
                     <Table.Tr key={dep.name}>
                       <Table.Td>{dep.name}</Table.Td>
                       <Table.Td>{dep.version}</Table.Td>
                     </Table.Tr>
-                  ))
-                )}
-              </Table.Tbody>
-            </Table>
-          </Stack>
+                  ))}
+                </Table.Tbody>
+              </Table>
+              <Text size="sm" c="dimmed" mt="sm">
+                Frontend dependencies
+              </Text>
+              <Table striped withColumnBorders>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th w="40%">Library</Table.Th>
+                    <Table.Th>Version</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {about.frontend_dependencies.length === 0 ? (
+                    <Table.Tr>
+                      <Table.Td colSpan={2}>No dependencies detected</Table.Td>
+                    </Table.Tr>
+                  ) : (
+                    about.frontend_dependencies.map((dep) => (
+                      <Table.Tr key={dep.name}>
+                        <Table.Td>{dep.name}</Table.Td>
+                        <Table.Td>{dep.version}</Table.Td>
+                      </Table.Tr>
+                    ))
+                  )}
+                </Table.Tbody>
+              </Table>
+            </Stack>
+          </Collapse>
         ) : (
           <Group justify="center">
             <Loader size="sm" />
