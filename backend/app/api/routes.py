@@ -3,12 +3,15 @@ import sys
 import importlib.metadata
 import json as jsonlib
 import subprocess
-from collections import deque
-from datetime import datetime
+import re
+from collections import deque, Counter
+from datetime import datetime, timedelta
 from pathlib import Path
+from time import perf_counter
 from typing import Iterable
+from loguru import logger
 from sqlalchemy.orm import selectinload
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Query
 from sqlalchemy import text, select
 from sqlalchemy.orm import Session
 from ..core.database import get_session
@@ -19,6 +22,7 @@ from ..schemas.common import (
     SeasonOut,
     SeasonDetail,
     SearchResult,
+    CachedSearchResponse,
     LogEntry,
     IndexerCreate,
     IndexerUpdate,
@@ -39,9 +43,9 @@ from ..schemas.common import (
     AboutResponse,
     DependencyVersion,
 )
-from ..models.entities import Season, Round, Indexer, Downloader
+from ..models.entities import Season, Round, Indexer, Downloader, CachedSearch
 from ..services.f1api import refresh_season
-from ..services.indexer_client import test_indexer_connection
+from ..services.indexer_client import test_indexer_connection, search_indexer
 from ..services.downloader_client import test_downloader_connection, send_to_downloader
 from ..services.auth import (
     ensure_auth_row,
@@ -335,6 +339,428 @@ def search_demo(auth: AuthSession = Depends(require_auth)) -> list[SearchResult]
     return results
 
 
+def _normalize_query_text(q: str) -> str:
+    normalized = re.sub(r"[._-]+", " ", q)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized
+
+
+def _swap_formula_tokens(tokens: list[str]) -> list[str]:
+    swapped: list[str] = []
+    skip_next = False
+    for idx, tok in enumerate(tokens):
+        if skip_next:
+            skip_next = False
+            continue
+        lower_tok = tok.lower()
+        if lower_tok in ("formula1", "formula"):  # normalize to F1
+            swapped.append("f1")
+            # If the pattern is ["formula", "1"], skip the numeric token
+            if idx + 1 < len(tokens) and tokens[idx + 1].lower() == "1":
+                skip_next = True
+        else:
+            swapped.append(tok)
+    return swapped
+
+
+def _query_variants(q: str) -> list[str]:
+    # Generate a small set of progressively looser queries.
+    stopwords = {"grand", "prix", "race", "round", "gp", "etihad", "airways"}
+    variants: list[str] = []
+
+    def add_variant(val: str) -> None:
+        val = val.strip()
+        if val and val not in variants:
+            variants.append(val)
+
+    normalized = _normalize_query_text(q)
+    add_variant(q)
+    add_variant(normalized)
+
+    tokens = normalized.split()
+    if tokens:
+        filtered = [t for t in tokens if t.lower() not in stopwords]
+        if filtered and filtered != tokens:
+            add_variant(" ".join(filtered))
+
+        if len(tokens) > 5:
+            add_variant(" ".join(tokens[:5]))
+
+        swapped = _swap_formula_tokens(tokens)
+        if swapped != tokens:
+            add_variant(" ".join(swapped))
+
+    return variants
+
+
+def _build_event_queries(year: int, round_name: str, round_number: int, event_type: str) -> list[str]:
+    venue = round_name
+    round_tag = f"Round {round_number}"
+    gp_tag = f"{venue} Grand Prix"
+
+    type_lower = event_type.lower()
+    variants: list[str] = []
+    if type_lower.startswith("fp1") or type_lower in {"practice 1", "practice one"}:
+        variants.extend(["FP1", "Practice One", "Practice 1"])
+    elif type_lower.startswith("fp2") or type_lower in {"practice 2", "practice two"}:
+        variants.extend(["FP2", "Practice Two", "Practice 2"])
+    elif type_lower.startswith("fp3") or type_lower in {"practice 3", "practice three"}:
+        variants.extend(["FP3", "Practice Three", "Practice 3"])
+    elif "qualifying" in type_lower and "sprint" in type_lower:
+        variants.extend(["Sprint Qualifying", "Sprint Shootout", "Sprint.Q", "Sprint Quali"])
+    elif "sprint" in type_lower:
+        variants.extend(["Sprint", "Sprint Race"])
+    elif "race" in type_lower:
+        variants.extend(["Race", "Grand Prix"])
+    elif "qual" in type_lower:
+        variants.extend(["Qualifying", "Quali"])
+    else:
+        variants.append(event_type)
+
+    bases = [
+        f"Formula1 {year} {gp_tag}",
+        f"Formula 1 {year} {gp_tag}",
+        f"F1 {year} {gp_tag}",
+        f"Formula1 {year} {round_tag} {venue}",
+        f"Formula 1 {year} {round_tag} {venue}",
+        f"F1 {year} {round_tag} {venue}",
+    ]
+
+    queries: list[str] = []
+    for base in bases:
+        for variant in variants:
+            combined = f"{base} {variant}".strip()
+            if combined not in queries:
+                queries.append(combined)
+    return queries
+
+
+def _canonical_round_name(name: str) -> str:
+    # Drop embedded year tokens and common sponsor noise, collapse whitespace to avoid overly specific queries.
+    cleaned = re.sub(r"\b\d{4}\b", "", name)
+    cleaned = re.sub(r"\b(airways|crypto\.com|aramco|heineken|pirelli|rolex)\b", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned or name
+
+
+def _is_round_match(title: str, season: Season, round_obj: Round) -> bool:
+    norm_title = _normalize_query_text(title).lower()
+    year_hit = str(season.year) in norm_title
+
+    # Exclude other series (F3, Academy, etc.).
+    if re.search(r"\bf3\b|formula\s*3|academy", norm_title):
+        return False
+
+    # Require Formula 1 signals to avoid other series sneaking in.
+    if not ("f1" in norm_title or "formula 1" in norm_title or "formula1" in norm_title):
+        return False
+
+    # Extract any explicit round numbers in the title.
+    round_num_matches = re.findall(r"\b(?:round|rnd|rd|r)\s*(\d{1,2})\b", norm_title)
+    round_nums = {int(n) for n in round_num_matches if n.isdigit()}
+    has_wrong_round = round_nums and round_obj.round_number not in round_nums
+    round_hit = round_obj.round_number in round_nums
+
+    # Location signals from round name/country/circuit, excluding generic words.
+    loc_terms: list[str] = []
+    canon = _canonical_round_name(round_obj.name).lower()
+    stop_terms = {"grand", "prix", "grand prix", "round", "gp", "formula", "f1"}
+    if canon:
+        parts = canon.split()
+        for p in parts:
+            if p and p not in stop_terms and len(p) >= 3:
+                loc_terms.append(p)
+        if len(parts) >= 2:
+            tail = " ".join(parts[-2:])
+            if tail.lower() not in stop_terms:
+                loc_terms.append(tail.lower())
+    if round_obj.country:
+        loc_terms.append(round_obj.country.lower())
+    if round_obj.circuit:
+        loc_terms.append(round_obj.circuit.lower())
+
+    loc_terms = [t for t in loc_terms if t and len(t) >= 3 and t not in stop_terms]
+    loc_hit = any(term in norm_title for term in loc_terms)
+
+    if not year_hit:
+        return False
+    if has_wrong_round:
+        return False
+    # Require location match; only if no location terms exist (unlikely) fall back to explicit matching round number.
+    if loc_terms and loc_hit:
+        return True
+    if not loc_terms and round_hit:
+        return True
+    return False
+
+
+_EVENT_TYPE_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
+    ("full-broadcast", re.compile(r"uncut|full broadcast|full\.broadcast", re.IGNORECASE)),
+    ("f1-kids", re.compile(r"f1\s*kids", re.IGNORECASE)),
+    ("pre-race-show", re.compile(r"pre[-\s]?race\s+show", re.IGNORECASE)),
+    ("post-race-show", re.compile(r"post[-\s]?race\s+show", re.IGNORECASE)),
+    ("teds-notebook-sprint", re.compile(r"teds.*sprint.*notebook", re.IGNORECASE)),
+    ("teds-notebook-qual", re.compile(r"teds.*qualifying.*notebook", re.IGNORECASE)),
+    ("teds-notebook-race", re.compile(r"teds.*notebook", re.IGNORECASE)),
+    ("post-sprint-show", re.compile(r"post[-\s]?sprint\s+show", re.IGNORECASE)),
+    ("pre-sprint-show", re.compile(r"pre[-\s]?sprint\s+show", re.IGNORECASE)),
+    ("sprint-qualifying", re.compile(r"sprint\s*qual(ifying)?|sprint\s*shootout", re.IGNORECASE)),
+    ("sprint", re.compile(r"\bsprint( race)?\b", re.IGNORECASE)),
+    ("qualifying", re.compile(r"\bqual(?!ity)\w*|\bq\d{1,2}\b", re.IGNORECASE)),
+    ("fp3", re.compile(r"fp\s*3|practice three", re.IGNORECASE)),
+    ("fp2", re.compile(r"fp\s*2|practice two", re.IGNORECASE)),
+    ("fp1", re.compile(r"fp\s*1|practice one", re.IGNORECASE)),
+    ("f1-live", re.compile(r"f1[\s.-]*live", re.IGNORECASE)),
+    ("f1-show", re.compile(r"f1[\s.-]*show", re.IGNORECASE)),
+    ("press-conference-drivers", re.compile(r"drivers?\s+press\s+conference", re.IGNORECASE)),
+    ("press-conference-principals", re.compile(r"team principals?\s+press\s+conference", re.IGNORECASE)),
+    # Treat "grand prix" as race only when no other session token appears; still catch explicit "race" or "GP".
+    (
+        "race",
+        re.compile(r"\brace\b|(?!(?:.*(fp\s*\d|practice|qual|shootout|sprint)))\bgrand[\s.-]*prix\b|\bgp\b", re.IGNORECASE),
+    ),
+]
+
+_DEFAULT_EVENT_ALLOWLIST = {"race", "qualifying", "sprint", "sprint-qualifying", "fp1", "fp2", "fp3"}
+
+
+def _classify_event_type(title: str) -> str | None:
+    normalized = _normalize_query_text(title).lower()
+    for evt_type, pattern in _EVENT_TYPE_PATTERNS:
+        if pattern.search(normalized):
+            return evt_type
+    return None
+
+
+def _build_event_allowlist(event_types: list[str] | None) -> set[str]:
+    if event_types:
+        normalized = {et.strip().lower() for et in event_types if et and et.strip()}
+        if normalized:
+            return normalized
+    return set(_DEFAULT_EVENT_ALLOWLIST)
+
+
+def _derive_event_allowlist(query: str, event_types: list[str] | None) -> set[str]:
+    """Resolve the allowlist from explicit params or by inferring from the query itself."""
+    explicit = _build_event_allowlist(event_types)
+    inferred = _classify_event_type(query)
+
+    # If the caller explicitly provided event_types, respect them.
+    if event_types:
+        # But if they passed the full default set, narrow to the inferred type when possible.
+        if inferred and explicit == set(_DEFAULT_EVENT_ALLOWLIST):
+            return {inferred}
+        return explicit
+
+    # No explicit allowlist: infer from the query when possible.
+    if inferred:
+        return {inferred}
+    return explicit
+
+
+def _search_indexer_with_variants(indexer: Indexer, variants: list[str], limit: int) -> list[SearchResult]:
+    results: list[SearchResult] = []
+    seen: set[str | tuple[str, str]] = set()
+
+    for variant in variants:
+        if len(results) >= limit:
+            break
+        variant_start = perf_counter()
+        batch = search_indexer(indexer, variant, limit=limit)
+        logger.debug(
+            "Variant search timing",
+            indexer=indexer.name,
+            variant=variant,
+            items=len(batch),
+            elapsed_ms=int((perf_counter() - variant_start) * 1000),
+        )
+        for item in batch:
+            key = item.nzb_url or (item.indexer.lower(), item.title.lower())
+            if key in seen:
+                continue
+            seen.add(key)
+            results.append(item)
+            if len(results) >= limit:
+                break
+
+    return results
+
+
+@router.get("/search", response_model=list[SearchResult])
+def search(
+    q: str,
+    limit: int = 25,
+    event_types: list[str] | None = Query(None, description="Allowed event types (e.g. race,qualifying,sprint,sprint-qualifying,fp1)"),
+    session: Session = Depends(get_session),
+    auth: AuthSession = Depends(require_auth),
+) -> list[SearchResult]:
+    query = q.strip()
+    if not query:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Query is required")
+
+    limit = max(1, min(limit, 50))
+    indexers = session.query(Indexer).filter_by(enabled=True).order_by(Indexer.name.asc()).all()
+    if not indexers:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No enabled indexers")
+
+    variants = _query_variants(query)
+    allowlist = _derive_event_allowlist(query, event_types)
+    all_results: list[SearchResult] = []
+    seen_global: set[str | tuple[str, str]] = set()
+    search_start = perf_counter()
+    for ix in indexers:
+        ix_results = _search_indexer_with_variants(ix, variants, limit)
+        for item in ix_results:
+            key = item.nzb_url or (item.indexer.lower(), item.title.lower())
+            if key in seen_global:
+                continue
+            event_type = _classify_event_type(item.title) or "other"
+            item.event_type = event_type
+            if allowlist and event_type not in allowlist:
+                continue
+            seen_global.add(key)
+            all_results.append(item)
+
+    # Basic sort: newest first (age_days ascending), then size desc
+    all_results.sort(key=lambda r: (r.age_days, -r.size_mb))
+    type_counts = Counter(r.event_type or "unknown" for r in all_results)
+    elapsed_ms = int((perf_counter() - search_start) * 1000)
+    log_response(
+        "search",
+        count=len(all_results),
+        query=query,
+        allowed=list(allowlist),
+        variants=len(variants),
+        indexers=len(indexers),
+        type_counts=dict(type_counts),
+        elapsed_ms=elapsed_ms,
+    )
+    return all_results
+
+
+def _search_round_events(
+    season: Season,
+    round_obj: Round,
+    indexers: list[Indexer],
+    limit_per_query: int = 50,
+) -> list[SearchResult]:
+    results: list[SearchResult] = []
+    seen: set[str | tuple[str, str]] = set()
+    now = datetime.utcnow()
+
+    past_events = [e for e in round_obj.events or [] if not e.start_time_utc or e.start_time_utc <= now]
+    if not past_events:
+        return []
+
+    # Map classified schedule types to their labels so we can tag results after lean round-level queries.
+    schedule_labels: dict[str, str] = {}
+    for ev in past_events:
+        classified = _classify_event_type(ev.type) or ev.type.lower()
+        if classified not in schedule_labels:
+            schedule_labels[classified] = ev.type
+
+    clean_name = _canonical_round_name(round_obj.name)
+    tokens = clean_name.split()
+    short_tail = " ".join(tokens[-2:]) if len(tokens) >= 2 else clean_name
+
+    base_names = []
+    if "grand prix" in clean_name.lower():
+        base_names.append(clean_name)
+    else:
+        base_names.append(f"{clean_name} Grand Prix")
+    base_names.append(f"Round {round_obj.round_number} {clean_name}")
+    base_names.append(clean_name)
+    if short_tail not in base_names:
+        base_names.append(short_tail)
+
+    queries: list[str] = []
+    for prefix in ("F1", "Formula 1"):
+        for bn in base_names:
+            q = f"{prefix} {season.year} {bn}".strip()
+            if q not in queries:
+                queries.append(q)
+
+    for ix in indexers:
+        for q in queries:
+            batch = search_indexer(ix, q, limit=limit_per_query)
+            for item in batch:
+                evt_type = _classify_event_type(item.title) or "other"
+                item.event_type = evt_type
+                label = schedule_labels.get(evt_type)
+                if not label:
+                    label = "Other"
+                item.event_label = label
+                if not _is_round_match(item.title, season, round_obj):
+                    continue
+                key = item.nzb_url or (item.indexer.lower(), item.title.lower())
+                if key in seen:
+                    continue
+                seen.add(key)
+                results.append(item)
+    # Sort newest first like /search
+    results.sort(key=lambda r: (r.age_days, -r.size_mb))
+    return results
+
+
+def _serialize_results(items: list[SearchResult]) -> str:
+    def _to_dict(item: SearchResult) -> dict:
+        data = item.model_dump()
+        return data
+
+    return json.dumps([_to_dict(i) for i in items])
+
+
+@router.get("/rounds/{round_id}/search", response_model=CachedSearchResponse)
+def search_round(
+    round_id: int,
+    force: bool = Query(False, description="Force refresh instead of using cached results"),
+    session: Session = Depends(get_session),
+    auth: AuthSession = Depends(require_auth),
+) -> CachedSearchResponse:
+    round_obj: Round | None = session.query(Round).options(selectinload(Round.events), selectinload(Round.season)).filter_by(id=round_id).first()
+    if not round_obj:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Round not found")
+    if not round_obj.season:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Round missing season context")
+
+    ttl = timedelta(hours=24)
+    cache: CachedSearch | None = session.query(CachedSearch).filter_by(round_id=round_id).first()
+    now = datetime.utcnow()
+    if cache and not force and cache.cached_at and now - cache.cached_at <= ttl:
+        try:
+            payload = json.loads(cache.results_json)
+            results = [SearchResult(**item) for item in payload]
+        except Exception:
+            results = []
+        log_response("search_round_cache_hit", round_id=round_id, count=len(results))
+        return CachedSearchResponse(results=results, from_cache=True, cached_at=cache.cached_at, ttl_hours=24)
+
+    indexers = session.query(Indexer).filter_by(enabled=True).order_by(Indexer.name.asc()).all()
+    if not indexers:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No enabled indexers")
+
+    results = _search_round_events(round_obj.season, round_obj, indexers, limit_per_query=50)
+
+    # Upsert cache row
+    serialized = _serialize_results(results)
+    if cache:
+        cache.results_json = serialized
+        cache.cached_at = now
+    else:
+        cache = CachedSearch(round_id=round_id, cached_at=now, results_json=serialized)
+        session.add(cache)
+    session.commit()
+
+    log_response(
+        "search_round_refreshed",
+        round_id=round_id,
+        count=len(results),
+        events=len(round_obj.events or []),
+        indexers=len(indexers),
+    )
+    return CachedSearchResponse(results=results, from_cache=False, cached_at=cache.cached_at, ttl_hours=24)
+
+
 def _tail_lines(path: Path, max_lines: int = 50) -> Iterable[str]:
     if not path.exists():
         return []
@@ -404,9 +830,9 @@ def update_indexer(
         item.name = payload.name
     if payload.api_url is not None:
         item.api_url = payload.api_url
-    if payload.api_key is not None:
+    if "api_key" in payload.__fields_set__:
         item.api_key = payload.api_key
-    if payload.category is not None:
+    if "category" in payload.__fields_set__:
         item.category = payload.category
     if payload.enabled is not None:
         item.enabled = payload.enabled
@@ -482,11 +908,11 @@ def update_downloader(
         item.type = payload.type
     if payload.api_url is not None:
         item.api_url = payload.api_url
-    if payload.api_key is not None:
+    if "api_key" in payload.__fields_set__:
         item.api_key = payload.api_key
-    if payload.category is not None:
+    if "category" in payload.__fields_set__:
         item.category = payload.category
-    if payload.priority is not None:
+    if "priority" in payload.__fields_set__:
         item.priority = payload.priority
     if payload.enabled is not None:
         item.enabled = payload.enabled

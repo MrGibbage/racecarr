@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Text
 from sqlalchemy.orm import relationship
 from ..core.database import Base
 
@@ -66,3 +66,11 @@ class AppConfig(Base):
     __tablename__ = "app_config"
     id = Column(Integer, primary_key=True)
     log_level = Column(String, nullable=False)
+
+
+class CachedSearch(Base):
+    __tablename__ = "cached_search"
+    id = Column(Integer, primary_key=True)
+    round_id = Column(Integer, ForeignKey("round.id"), nullable=False, index=True)
+    cached_at = Column(DateTime, nullable=False)
+    results_json = Column(Text, nullable=False)

@@ -12,6 +12,7 @@ import {
   Table,
   Text,
   Title,
+  TextInput,
 } from "@mantine/core";
 import { apiFetch } from "../api";
 
@@ -37,12 +38,13 @@ export function Search() {
   const [error, setError] = useState<string | null>(null);
   const [downloaders, setDownloaders] = useState<Downloader[]>([]);
   const [selectedDownloaderId, setSelectedDownloaderId] = useState<string | null>(null);
+  const [query, setQuery] = useState("F1");
 
-  const loadDemo = async () => {
+  const runSearch = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await apiFetch(`/search-demo`);
+      const res = await apiFetch(`/search?q=${encodeURIComponent(query)}`);
       if (!res.ok) throw new Error(`Search failed (${res.status})`);
       const data = (await res.json()) as SearchResult[];
       setResults(data);
@@ -66,7 +68,7 @@ export function Search() {
   };
 
   useEffect(() => {
-    loadDemo();
+    runSearch();
     loadDownloaders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -93,6 +95,13 @@ export function Search() {
       <Group justify="space-between" align="center">
         <Title order={2}>Search</Title>
         <Group gap="sm">
+          <TextInput
+            label="Query"
+            placeholder="e.g. 2026 Bahrain Qualifying"
+            value={query}
+            onChange={(e) => setQuery(e.currentTarget.value)}
+            maw={320}
+          />
           {downloaders.length > 0 && (
             <Select
               label="Downloader"
@@ -101,11 +110,11 @@ export function Search() {
               onChange={setSelectedDownloaderId}
               placeholder="Select downloader"
               maw={220}
-              withinPortal
+              comboboxProps={{ withinPortal: true }}
             />
           )}
-          <Button variant="default" onClick={loadDemo} loading={loading}>
-            Refresh demo results
+          <Button variant="default" onClick={runSearch} loading={loading} disabled={!query.trim()}>
+            Search
           </Button>
         </Group>
       </Group>
@@ -162,6 +171,15 @@ export function Search() {
                     </Table.Td>
                   </Table.Tr>
                 ))}
+                {!loading && !results.length && (
+                  <Table.Tr>
+                    <Table.Td colSpan={8}>
+                      <Text c="dimmed" size="sm">
+                        No results yet.
+                      </Text>
+                    </Table.Td>
+                  </Table.Tr>
+                )}
               </Table.Tbody>
             </Table>
           </ScrollArea>

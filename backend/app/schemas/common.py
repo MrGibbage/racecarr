@@ -57,12 +57,21 @@ class SearchResult(BaseModel):
     leechers: int
     quality: str
     nzb_url: str | None = None
+    event_type: str | None = None
+    event_label: str | None = None
 
 
 class LogEntry(BaseModel):
     timestamp: str
     level: str
     message: str
+
+
+class CachedSearchResponse(BaseModel):
+    results: list[SearchResult]
+    from_cache: bool
+    cached_at: datetime | None = None
+    ttl_hours: int = 24
 
 
 class IndexerBase(BaseModel):

@@ -5,9 +5,12 @@ import {
   Button,
   Card,
   Divider,
+  Drawer,
   Group,
   Loader,
+  ScrollArea,
   Stack,
+  Table,
   Text,
   Title,
 } from "@mantine/core";
@@ -34,6 +37,26 @@ type Season = {
   year: number;
   last_refreshed: string | null;
   rounds: Round[];
+};
+
+type SearchResult = {
+  title: string;
+  indexer: string;
+  size_mb: number;
+  age_days: number;
+  seeders: number;
+  leechers: number;
+  quality: string;
+  nzb_url?: string | null;
+  event_type?: string | null;
+  event_label?: string | null;
+};
+
+type CachedSearchResponse = {
+  results: SearchResult[];
+  from_cache: boolean;
+  cached_at?: string | null;
+  ttl_hours: number;
 };
 
 const utcFormatter = new Intl.DateTimeFormat("en-US", {
@@ -75,6 +98,16 @@ export function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [seeding, setSeeding] = useState(false);
   const [refreshingYear, setRefreshingYear] = useState<number | null>(null);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchDrawerOpen, setSearchDrawerOpen] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [searchTitle, setSearchTitle] = useState<string>("");
+  const [selectedEventFilter, setSelectedEventFilter] = useState<string | null>(null);
+  const [usingCache, setUsingCache] = useState<boolean>(false);
+  const [cachedAt, setCachedAt] = useState<string | null>(null);
+  const [activeRound, setActiveRound] = useState<{ season: Season; round: Round } | null>(null);
+  const [pendingFilter, setPendingFilter] = useState<string | null>(null);
 
   const ensureStateForSeasons = (items: Season[]) => {
     setExpandedSeasons((prev) => {
@@ -177,17 +210,77 @@ export function Dashboard() {
     setExpandedRounds((prev) => ({ ...prev, [season.id]: next }));
   };
 
+  const isPastEvent = (ev: Event) => {
+    if (!ev.start_time_utc) return false;
+    const dt = new Date(ev.start_time_utc);
+    return !Number.isNaN(dt.getTime()) && dt.getTime() <= Date.now();
+  };
+
+  const handleRoundSearch = async (season: Season, round: Round, force = false) => {
+    const pastEvents = (round.events || []).filter(isPastEvent);
+    setActiveRound({ season, round });
+    setSearchTitle(`Search: Round ${round.round_number} · ${round.name}`);
+    setSearchDrawerOpen(true);
+    setSearching(true);
+    setSearchError(null);
+    setSearchResults([]);
+    setUsingCache(false);
+    setCachedAt(null);
+    if (!pastEvents.length) {
+      setSearchError("No completed events to search yet.");
+      setSearching(false);
+      return;
+    }
+    try {
+      const res = await apiFetch(`/rounds/${round.id}/search?force=${force ? "true" : "false"}`);
+      if (!res.ok) throw new Error(`Search failed (${res.status})`);
+      const data = (await res.json()) as CachedSearchResponse;
+      setSearchResults(data.results);
+      setUsingCache(data.from_cache);
+      setCachedAt(data.cached_at ?? null);
+      if (pendingFilter) {
+        setSelectedEventFilter(pendingFilter);
+        setPendingFilter(null);
+      } else {
+        setSelectedEventFilter(null);
+      }
+    } catch (err) {
+      setSearchError(err instanceof Error ? err.message : "Search failed");
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const viewEventResults = async (season: Season, round: Round, ev: Event) => {
+    if (!isPastEvent(ev)) return;
+    setSelectedEventFilter(ev.type);
+    if (activeRound?.round.id === round.id && searchResults.length) {
+      setSearchDrawerOpen(true);
+      return;
+    }
+    setPendingFilter(ev.type);
+    await handleRoundSearch(season, round, false);
+  };
+
   useEffect(() => {
     fetchSeasons();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const renderEvents = (round: Round) => {
+  const filteredResults = selectedEventFilter
+    ? searchResults.filter((r) => {
+        const label = (r.event_label || "Other").toLowerCase();
+        return label === selectedEventFilter.toLowerCase();
+      })
+    : searchResults;
+
+  const renderEvents = (season: Season, round: Round) => {
     if (!round.events?.length) return <Text c="dimmed" size="sm">No events yet.</Text>;
     return (
       <Stack gap={4}>
         {round.events.map((ev, idx) => (
-          <Group key={`${round.round_number}-${ev.type}-${idx}`} gap="xs">
+          <Group key={`${round.round_number}-${ev.type}-${idx}`} gap="xs" align="center">
             <Badge color="blue" variant="light" size="sm">
               {ev.type}
             </Badge>
@@ -201,6 +294,16 @@ export function Dashboard() {
                 </Stack>
               );
             })()}
+            {isPastEvent(ev) && (
+              <Button
+                size="xs"
+                variant="light"
+                onClick={() => viewEventResults(season, round, ev)}
+                disabled={searching}
+              >
+                View
+              </Button>
+            )}
           </Group>
         ))}
       </Stack>
@@ -242,7 +345,18 @@ export function Dashboard() {
               {isRoundExpanded(season.id, rnd.round_number) && (
                 <>
                   <Divider my={8} />
-                  {renderEvents(rnd)}
+                  <Group justify="space-between" align="center" mb="xs">
+                    <Text fw={600}>Events</Text>
+                    <Button
+                      size="xs"
+                      variant="subtle"
+                      onClick={() => handleRoundSearch(season, rnd)}
+                      disabled={searching}
+                    >
+                      Search all events
+                    </Button>
+                  </Group>
+                  {renderEvents(season, rnd)}
                 </>
               )}
             </Card>
@@ -252,72 +366,187 @@ export function Dashboard() {
   };
 
   return (
-    <Stack gap="md">
-      <Group justify="space-between" align="center">
-        <Title order={2}>Dashboard</Title>
-        <Group gap="xs">
-          <Button variant="default" onClick={fetchSeasons} loading={loading}>
-            Refresh list
-          </Button>
-          <Button onClick={seedDemo} loading={seeding}>
-            Seed demo seasons
-          </Button>
+    <>
+      <Stack gap="md">
+        <Group justify="space-between" align="center">
+          <Title order={2}>Dashboard</Title>
+          <Group gap="xs">
+            <Button variant="default" onClick={fetchSeasons} loading={loading}>
+              Refresh list
+            </Button>
+            <Button onClick={seedDemo} loading={seeding}>
+              Seed demo seasons
+            </Button>
+          </Group>
         </Group>
-      </Group>
 
-      {error && (
-        <Alert color="red" title="Error" variant="light">
-          {error}
-        </Alert>
-      )}
+        {error && (
+          <Alert color="red" title="Error" variant="light">
+            {error}
+          </Alert>
+        )}
 
-      {loading && !seasons.length ? (
-        <Group justify="center">
-          <Loader />
-        </Group>
-      ) : seasons.length ? (
-        <Stack gap="sm">
-          {seasons.map((season) => (
-            <Card key={season.id} withBorder padding="md">
-              <Group justify="space-between" align="flex-start">
-                <div>
-                  <Title order={3}>Season {season.year}</Title>
-                  <Text c="dimmed" size="sm">
-                    {season.last_refreshed
-                      ? `Last refreshed: ${new Date(season.last_refreshed).toLocaleString()}`
-                      : "Not refreshed yet"}
-                  </Text>
-                </div>
-                <Group gap="xs">
-                  <Button
-                    variant="subtle"
-                    size="xs"
-                    onClick={() => toggleSeason(season)}
-                  >
-                    {isSeasonExpanded(season.id) ? "Collapse season" : "Expand season"}
-                  </Button>
-                  <Button
-                    variant="default"
-                    size="xs"
-                    loading={refreshingYear === season.year}
-                    onClick={() => refreshSeason(season.year)}
-                  >
-                    Refresh season
-                  </Button>
-                  <Badge color="blue" variant="light">
-                    Active
-                  </Badge>
+        {loading && !seasons.length ? (
+          <Group justify="center">
+            <Loader />
+          </Group>
+        ) : seasons.length ? (
+          <Stack gap="sm">
+            {seasons.map((season) => (
+              <Card key={season.id} withBorder padding="md">
+                <Group justify="space-between" align="flex-start">
+                  <div>
+                    <Title order={3}>Season {season.year}</Title>
+                    <Text c="dimmed" size="sm">
+                      {season.last_refreshed
+                        ? `Last refreshed: ${new Date(season.last_refreshed).toLocaleString()}`
+                        : "Not refreshed yet"}
+                    </Text>
+                  </div>
+                  <Group gap="xs">
+                    <Button
+                      variant="subtle"
+                      size="xs"
+                      onClick={() => toggleSeason(season)}
+                    >
+                      {isSeasonExpanded(season.id) ? "Collapse season" : "Expand season"}
+                    </Button>
+                    <Button
+                      variant="default"
+                      size="xs"
+                      loading={refreshingYear === season.year}
+                      onClick={() => refreshSeason(season.year)}
+                    >
+                      Refresh season
+                    </Button>
+                    <Badge color="blue" variant="light">
+                      Active
+                    </Badge>
+                  </Group>
                 </Group>
+                {isSeasonExpanded(season.id) && renderRounds(season)}
+              </Card>
+            ))}
+          </Stack>
+        ) : (
+          <Card withBorder padding="md">
+            <Text c="dimmed">No seasons yet. Seed some demo data to get started.</Text>
+          </Card>
+        )}
+      </Stack>
+
+      <Drawer
+        opened={searchDrawerOpen}
+        onClose={() => setSearchDrawerOpen(false)}
+        position="top"
+        size="90vh"
+        title={searchTitle || "Search results"}
+      >
+        <Stack gap="sm">
+          {searchError && (
+            <Alert color="red" title="Search error" variant="light">
+              {searchError}
+            </Alert>
+          )}
+          {usingCache && (
+            <Alert color="yellow" title="Using cached results" variant="light">
+              <Group justify="space-between" align="center">
+                <Text size="sm">
+                  Cached at {cachedAt ? new Date(cachedAt).toLocaleString() : "unknown"}. Reload to refresh.
+                </Text>
+                {activeRound && (
+                  <Button
+                    size="xs"
+                    variant="light"
+                    onClick={() => handleRoundSearch(activeRound.season, activeRound.round, true)}
+                  >
+                    Reload
+                  </Button>
+                )}
               </Group>
-              {isSeasonExpanded(season.id) && renderRounds(season)}
-            </Card>
-          ))}
+            </Alert>
+          )}
+
+          {searching && !searchResults.length ? (
+            <Group justify="center">
+              <Loader />
+            </Group>
+          ) : searchResults.length ? (
+            <Stack gap="xs">
+              <Group gap="xs" align="center">
+                <Text size="sm" c="dimmed">
+                  Filter by event:
+                </Text>
+                <Button
+                  size="xs"
+                  variant={selectedEventFilter ? "subtle" : "filled"}
+                  onClick={() => setSelectedEventFilter(null)}
+                >
+                  All
+                </Button>
+                {Array.from(
+                  new Set(searchResults.map((r) => r.event_label || "Other").filter(Boolean))
+                ).map((ev) => (
+                  <Button
+                    key={ev as string}
+                    size="xs"
+                    variant={selectedEventFilter === ev ? "filled" : "subtle"}
+                    onClick={() => setSelectedEventFilter(ev as string)}
+                  >
+                    {ev}
+                  </Button>
+                ))}
+              </Group>
+              <ScrollArea h="65vh" offsetScrollbars>
+                <Table striped highlightOnHover withColumnBorders stickyHeader>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>Event</Table.Th>
+                      <Table.Th>Title</Table.Th>
+                      <Table.Th>Indexer</Table.Th>
+                      <Table.Th>Quality</Table.Th>
+                      <Table.Th ta="right">Size (MB)</Table.Th>
+                      <Table.Th ta="right">Age (days)</Table.Th>
+                      <Table.Th>NZB</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {filteredResults.map((row, idx) => (
+                      <Table.Tr key={`${row.title}-${idx}`}>
+                        <Table.Td>{row.event_label || ""}</Table.Td>
+                        <Table.Td>{row.title}</Table.Td>
+                        <Table.Td>{row.indexer}</Table.Td>
+                        <Table.Td>
+                          <Badge color="blue" variant="light">
+                            {row.quality}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td ta="right">{row.size_mb.toLocaleString()}</Table.Td>
+                        <Table.Td ta="right">{row.age_days}</Table.Td>
+                        <Table.Td>
+                          {row.nzb_url ? (
+                            <a href={row.nzb_url} target="_blank" rel="noreferrer">
+                              Download
+                            </a>
+                          ) : (
+                            <Text size="sm" c="dimmed">
+                              None
+                            </Text>
+                          )}
+                        </Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </ScrollArea>
+            </Stack>
+          ) : (
+            <Text c="dimmed" size="sm">
+              No results yet.
+            </Text>
+          )}
         </Stack>
-      ) : (
-        <Card withBorder padding="md">
-          <Text c="dimmed">No seasons yet. Seed some demo data to get started.</Text>
-        </Card>
-      )}
-    </Stack>
+      </Drawer>
+    </>
   );
 }

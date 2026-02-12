@@ -56,6 +56,7 @@ Shows at-a-glance information:
 - Past events show podium results (from f1api.dev)
 - When not using demo data, default season list to current year and previous year; user can configure a start year to limit how far back seasons are loaded (API goes to 1950)
  - UI time display supports a user-selectable time zone override (defaults to browser local) alongside UTC; track-local shown when available
+ - “Search all events” performs one round-level query across enabled indexers, caches results for 24 hours (with a reload override), and filters results by round/year + event type. Filters include the “big seven” plus “Other”.
 
 ## 2.4 Event Detail Screen  
 - All metadata for the round  
@@ -150,6 +151,7 @@ Tabs include:
   - Select default profile; allow per-search override before sending to downloader.  
 - **Search & Scoring**  
   - Toggle fan-out query set; maxage window; auto-grab score threshold; advanced scoring weight tweaks.  
+  - Event-type filters list (MVP): user-toggleable allowlist covering the “big seven” (Race, Qualifying, Sprint, Sprint Qualifying, FP1, FP2, FP3) plus “Other” for miscellaneous sessions (press conferences, F1 Live, shows). Allowlist is applied to search results, scoring, and auto-grab/rule evaluation; non-allowed types are filtered out by default.  
 - **Scheduler**  
   - Tick interval; jitter toggle; aggressive/decay cadence windows; stop-after-days; concurrency cap per indexer.  
 - **Notifications**  
@@ -173,6 +175,7 @@ Tabs include:
   - Paths & Storage: media root, optional temp folder, free-space display, warn-only on low space.  
   - Quality Profiles: min/max resolution, codec pref (HEVC/H.264), HDR/HLG allowed, default profile, per-search override toggle.  
   - Search & Scoring: default fan-out enabled, maxage window, auto-grab threshold (no weight-tuning UI yet).  
+  - Event Types: user-configurable allowlist for the big seven (Race, Qualifying, Sprint, Sprint Qualifying, FP1, FP2, FP3); misc sessions (e.g., warm-up, shakedown, press) are opt-in. Non-allowed and uncategorized (“other”) hits are filtered out by default; adding them to the allowlist surfaces them.  
   - Scheduler: tick interval, cadence windows (aggressive/decay), stop-after-days, concurrency cap toggle.  
   - Notifications: Apprise endpoints, choose events, test.  
   - Logging: log level, retention days/size cap; support bundle download.  
@@ -377,6 +380,7 @@ Supported:
 - **Client-side regex classification:** After retrieval, classify titles (examples from nzbgeek samples):  
   - `Formula\.?(?P<series>1|E)\.?(?P<year>\d{4})\.?(Round)?(?P<round>\d{2})\.(?P<venue>[A-Za-z\.]+)\.(?P<session>Race|Qualifying|Sprint|FP[123]|Practice(?:\.One|\.Two|\.Three)?|Preview)`  
   - TV-style: `S(?P<season>\d{4})E(?P<ep>\d{2,3})`  
+  - Tag each result into canonical event types (big seven: Race, Qualifying, Sprint, Sprint Qualifying, FP1, FP2, FP3; plus misc such as warm-up/shakedown/press/notebook/show/pre/post/analysis) and apply the event-type allowlist before scoring/auto-grab.  
 - **Scoring heuristic:** Higher score when year/round/session all match; prefer exact venue tokens; downgrade previews/notebooks unless requested; filter out mismatched years/rounds.  
 - **Normalization:** Treat `.`/`_` as spaces; keep both `Formula1` and `Formula 1`; map alias tokens (`Grand Prix`, city, or country) into search strings; accept uppercase/lowercase variants.  
 - **Telemetry for tuning:** Log emitted queries and top matches per event to refine patterns; allow operator overrides for venue aliases and session labels.  

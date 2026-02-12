@@ -82,7 +82,6 @@ type AboutResponse = {
 
 const stopKeyProp = (e: React.KeyboardEvent<HTMLInputElement>) => {
   e.stopPropagation();
-  // @ts-expect-error: stopImmediatePropagation exists on the native event
   e.nativeEvent.stopImmediatePropagation?.();
 };
 
@@ -94,7 +93,6 @@ const handleControlledBackspace = (
   if (e.key !== "Backspace") return;
   e.preventDefault();
   e.stopPropagation();
-  // @ts-expect-error native method exists
   e.nativeEvent.stopImmediatePropagation?.();
   const input = e.currentTarget;
   const start = input.selectionStart ?? current.length;
@@ -114,7 +112,6 @@ const handleControlledBackspace = (
 
 const stopAllKeysCapture = (e: React.KeyboardEvent) => {
   e.stopPropagation();
-  // @ts-expect-error native method exists
   e.nativeEvent.stopImmediatePropagation?.();
 };
 
@@ -129,7 +126,6 @@ const blockNavigationKeys = (event: KeyboardEvent) => {
   if (isRefresh) {
     event.preventDefault();
     event.stopPropagation();
-    // @ts-expect-error native method exists
     event.stopImmediatePropagation?.();
     return;
   }
@@ -137,7 +133,6 @@ const blockNavigationKeys = (event: KeyboardEvent) => {
   if (event.key === "Backspace" && !inTextField) {
     event.preventDefault();
     event.stopPropagation();
-    // @ts-expect-error native method exists
     event.stopImmediatePropagation?.();
   }
 };
@@ -713,7 +708,7 @@ export function Settings() {
               value={editDownloaderPayload?.type || "sabnzbd"}
               onChange={(val) => setEditDownloaderPayload((prev) => (prev ? { ...prev, type: val || "sabnzbd" } : prev))}
               size="xs"
-              withinPortal
+              comboboxProps={{ withinPortal: true }}
             />
           ) : (
             dl.type
@@ -777,8 +772,12 @@ export function Settings() {
         <Table.Td>
           {isEditing ? (
             <NumberInput
-              value={editDownloaderPayload?.priority ?? null}
-              onChange={(val) => setEditDownloaderPayload((prev) => (prev ? { ...prev, priority: val as number | null } : prev))}
+              value={editDownloaderPayload?.priority ?? undefined}
+              onChange={(val) =>
+                setEditDownloaderPayload((prev) =>
+                  prev ? { ...prev, priority: typeof val === "number" ? val : null } : prev
+                )
+              }
               placeholder="Priority"
               size="xs"
               allowDecimal={false}
@@ -1112,7 +1111,7 @@ export function Settings() {
             value={newDownloader.type}
             onChange={(val) => setNewDownloader({ ...newDownloader, type: val || "sabnzbd" })}
             maw={180}
-            withinPortal
+            comboboxProps={{ withinPortal: true }}
           />
           <TextInput
             label="API URL"
@@ -1148,8 +1147,10 @@ export function Settings() {
           <NumberInput
             label="Priority"
             placeholder="optional"
-            value={newDownloader.priority}
-            onChange={(val) => setNewDownloader({ ...newDownloader, priority: val as number | null })}
+            value={newDownloader.priority ?? undefined}
+            onChange={(val) =>
+              setNewDownloader({ ...newDownloader, priority: typeof val === "number" ? val : null })
+            }
             allowDecimal={false}
             maw={140}
           />

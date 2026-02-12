@@ -30,6 +30,10 @@
 - [x] Logs: shows last log entries table (timestamp/level/message)
 > Note: frontend calls `VITE_API_URL` if provided, otherwise `http://localhost:8000/api`.
 
+### Round search & caching
+- [ ] “Search all events” runs a single round-level query per indexer, respects 24h cache, and “Reload” bypasses cache
+- [ ] Results are filtered to the selected round by year/location; event filter buttons include the big seven plus “Other”; “All” shows everything for that round
+
 ### Settings / Auth
 - [x] Single-password auth: login flow, password change, session idle timeout (remember-me + logout)
 - [x] Log level setting persists and changes verbosity
