@@ -24,5 +24,7 @@ WORKDIR /app
 COPY --from=backend-build /usr/local/lib/python3.12 /usr/local/lib/python3.12
 COPY --from=backend-build /usr/local/bin/uvicorn /usr/local/bin/uvicorn
 COPY --from=backend-build /app/backend ./backend
+# Keep frontend package manifest for About dependencies list
+COPY --from=frontend-build /app/frontend/package.json ./frontend/package.json
 EXPOSE 8080
 CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8080"]

@@ -36,10 +36,10 @@
 - [x] About/version displays current build
 
 ### Docker end-to-end (container on 8080)
-- [ ] From repo root: `docker compose up --build`
-- [ ] App served at http://localhost:8080/
-- [ ] API at http://localhost:8080/api/... (healthz/readyz/seasons/search-demo/logs)
-- [ ] Navigate UI (Dashboard/Search/Logs) and confirm data renders
+- [x] From repo root: `docker compose up --build`
+- [x] App served at http://localhost:8080/
+- [x] API at http://localhost:8080/api/... (healthz/readyz/seasons/search-demo/logs)
+- [x] Navigate UI (Dashboard/Search/Logs) and confirm data renders
 
 ### Indexers & Search (real integrations)
 - [ ] Add/indexer settings form (NZBGeek/Newznab/Hydra2) saves and tests connection

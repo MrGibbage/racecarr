@@ -1,5 +1,6 @@
 import httpx
 from typing import Tuple
+from loguru import logger
 from ..models.entities import Downloader
 
 
@@ -39,15 +40,20 @@ def _test_sabnzbd(downloader: Downloader) -> Tuple[bool, str]:
     api_key = downloader.api_key or ""
     url = downloader.api_url.rstrip("/") + "/api"
     params = {"mode": "queue", "output": "json", "apikey": api_key}
+    logger.debug("Testing SABnzbd connection", name=downloader.name, url=url)
     try:
         resp = httpx.get(url, params=params, timeout=10)
     except httpx.RequestError as exc:
+        logger.warning("SABnzbd request failed", name=downloader.name, url=url, error=str(exc))
         return False, f"Request failed: {exc}"
     if resp.status_code != 200:
+        logger.warning("SABnzbd non-200", name=downloader.name, status=resp.status_code)
         return False, f"HTTP {resp.status_code} from SABnzbd"
     data = resp.json()
     if data.get("status") is False:
+        logger.warning("SABnzbd reported failure", name=downloader.name)
         return False, "SABnzbd reported failure"
+    logger.debug("SABnzbd test succeeded", name=downloader.name)
     return True, "SABnzbd OK"
 
 
@@ -86,17 +92,23 @@ def _test_nzbget(downloader: Downloader) -> Tuple[bool, str]:
     auth = None
     if downloader.api_key:
         auth = (downloader.api_key, "")
+    logger.debug("Testing NZBGet connection", name=downloader.name, url=url)
     try:
         resp = httpx.post(url, json=payload, timeout=10, auth=auth)
     except httpx.RequestError as exc:
+        logger.warning("NZBGet request failed", name=downloader.name, url=url, error=str(exc))
         return False, f"Request failed: {exc}"
     if resp.status_code != 200:
+        logger.warning("NZBGet non-200", name=downloader.name, status=resp.status_code)
         return False, f"HTTP {resp.status_code} from NZBGet"
     data = resp.json()
     if data.get("error"):
+        logger.warning("NZBGet error", name=downloader.name, error=data.get("error"))
         return False, f"NZBGet error: {data['error']}"
     if "result" not in data:
+        logger.warning("NZBGet missing result", name=downloader.name)
         return False, "Unexpected NZBGet response"
+    logger.debug("NZBGet test succeeded", name=downloader.name)
     return True, "NZBGet OK"
 
 

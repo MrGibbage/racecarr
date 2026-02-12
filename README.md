@@ -17,7 +17,8 @@ uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 # frontend (separate terminal)
 cd frontend
 npm install
-npm run dev -- --host --port 5173
+npm run dev
+# (add --host if you need LAN access; --port 5173 if you want to pin the port)
 ```
 
 Backend listens on 8000 in dev. Frontend dev server runs on 5173; API base resolves to `VITE_API_URL` when set, otherwise falls back to `http://localhost:8000/api`.
@@ -58,4 +59,5 @@ Container listens on 8080. Frontend is served at `/`, API at `/api/*`.
 
 ## Notes
 - Static frontend is bundled into the backend image under `backend/app/static` and served by FastAPI in Docker.
+- Frontend package manifest is also baked into the image so the About page can display frontend dependency versions.
 - SQLite database at `/config/data.db` by default (config volume is mapped in compose).

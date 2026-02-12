@@ -2,73 +2,25 @@ import React, { useEffect, useState } from "react";
 import {
   Alert,
   Badge,
-        {about ? (
-          <>
-            <Group gap="md" wrap="wrap" mb="xs">
-              <Text fw={600}>{about.app_name}</Text>
-              <Badge variant="light">v{about.app_version}</Badge>
-              <Badge variant="outline" color="gray">Python {about.python_version}</Badge>
-              {about.git_sha && (
-                <Badge variant="outline" color="blue">Git {about.git_sha.slice(0, 7)}</Badge>
-              )}
-              {about.server_started_at && (
-                <Badge variant="outline" color="teal">Started {about.server_started_at}</Badge>
-              )}
-              {about.github_url && (
-                <a href={about.github_url} target="_blank" rel="noreferrer">
-                  GitHub
-                </a>
-              )}
-            </Group>
-            <Collapse in={aboutOpen}>
-              <Stack gap="xs">
-                <Text size="sm" c="dimmed">
-                  Backend dependencies
-                </Text>
-                <Table striped withColumnBorders>
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th w="40%">Library</Table.Th>
-                      <Table.Th>Version</Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {about.backend_dependencies.map((dep) => (
-                      <Table.Tr key={dep.name}>
-                        <Table.Td>{dep.name}</Table.Td>
-                        <Table.Td>{dep.version}</Table.Td>
-                      </Table.Tr>
-                    ))}
-                  </Table.Tbody>
-                </Table>
-                <Text size="sm" c="dimmed" mt="sm">
-                  Frontend dependencies
-                </Text>
-                <Table striped withColumnBorders>
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th w="40%">Library</Table.Th>
-                      <Table.Th>Version</Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {about.frontend_dependencies.length === 0 ? (
-                      <Table.Tr>
-                        <Table.Td colSpan={2}>No dependencies detected</Table.Td>
-                      </Table.Tr>
-                    ) : (
-                      about.frontend_dependencies.map((dep) => (
-                        <Table.Tr key={dep.name}>
-                          <Table.Td>{dep.name}</Table.Td>
-                          <Table.Td>{dep.version}</Table.Td>
-                        </Table.Tr>
-                      ))
-                    )}
-                  </Table.Tbody>
-                </Table>
-              </Stack>
-            </Collapse>
-          </>
+  Button,
+  Group,
+  Loader,
+  NumberInput,
+  Paper,
+  Select,
+  Stack,
+  Switch,
+  Table,
+  Text,
+  TextInput,
+  Title,
+  PasswordInput,
+  Collapse,
+  ActionIcon,
+  Tooltip,
+} from "@mantine/core";
+import { IconCopy } from "@tabler/icons-react";
+import { apiFetch } from "../api";
 
 type Indexer = {
   id: number;
@@ -973,70 +925,72 @@ export function Settings() {
           </Group>
         </Group>
         {about ? (
-          <Collapse in={aboutOpen}>
-            <Stack gap="xs">
-              <Group gap="md" wrap="wrap">
-                <Text fw={600}>{about.app_name}</Text>
-                <Badge variant="light">v{about.app_version}</Badge>
-                <Badge variant="outline" color="gray">Python {about.python_version}</Badge>
-                {about.git_sha && (
-                  <Badge variant="outline" color="blue">Git {about.git_sha.slice(0, 7)}</Badge>
-                )}
-                {about.server_started_at && (
-                  <Badge variant="outline" color="teal">Started {about.server_started_at}</Badge>
-                )}
-                {about.github_url && (
-                  <a href={about.github_url} target="_blank" rel="noreferrer">
-                    GitHub
-                  </a>
-                )}
-              </Group>
-              <Text size="sm" c="dimmed">
-                Backend dependencies
-              </Text>
-              <Table striped withColumnBorders>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th w="40%">Library</Table.Th>
-                    <Table.Th>Version</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {about.backend_dependencies.map((dep) => (
-                    <Table.Tr key={dep.name}>
-                      <Table.Td>{dep.name}</Table.Td>
-                      <Table.Td>{dep.version}</Table.Td>
-                    </Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table>
-              <Text size="sm" c="dimmed" mt="sm">
-                Frontend dependencies
-              </Text>
-              <Table striped withColumnBorders>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th w="40%">Library</Table.Th>
-                    <Table.Th>Version</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {about.frontend_dependencies.length === 0 ? (
+          <>
+            <Group gap="md" wrap="wrap">
+              <Text fw={600}>{about.app_name}</Text>
+              <Badge variant="light">v{about.app_version}</Badge>
+              <Badge variant="outline" color="gray">Python {about.python_version}</Badge>
+              {about.git_sha && (
+                <Badge variant="outline" color="blue">Git {about.git_sha.slice(0, 7)}</Badge>
+              )}
+              {about.server_started_at && (
+                <Badge variant="outline" color="teal">Started {about.server_started_at}</Badge>
+              )}
+              {about.github_url && (
+                <a href={about.github_url} target="_blank" rel="noreferrer">
+                  GitHub
+                </a>
+              )}
+            </Group>
+            <Collapse in={aboutOpen}>
+              <Stack gap="xs" mt="xs">
+                <Text size="sm" c="dimmed">
+                  Backend dependencies
+                </Text>
+                <Table striped withColumnBorders>
+                  <Table.Thead>
                     <Table.Tr>
-                      <Table.Td colSpan={2}>No dependencies detected</Table.Td>
+                      <Table.Th w="40%">Library</Table.Th>
+                      <Table.Th>Version</Table.Th>
                     </Table.Tr>
-                  ) : (
-                    about.frontend_dependencies.map((dep) => (
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {about.backend_dependencies.map((dep) => (
                       <Table.Tr key={dep.name}>
                         <Table.Td>{dep.name}</Table.Td>
                         <Table.Td>{dep.version}</Table.Td>
                       </Table.Tr>
-                    ))
-                  )}
-                </Table.Tbody>
-              </Table>
-            </Stack>
-          </Collapse>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+                <Text size="sm" c="dimmed" mt="sm">
+                  Frontend dependencies
+                </Text>
+                <Table striped withColumnBorders>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th w="40%">Library</Table.Th>
+                      <Table.Th>Version</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {about.frontend_dependencies.length === 0 ? (
+                      <Table.Tr>
+                        <Table.Td colSpan={2}>No dependencies detected</Table.Td>
+                      </Table.Tr>
+                    ) : (
+                      about.frontend_dependencies.map((dep) => (
+                        <Table.Tr key={dep.name}>
+                          <Table.Td>{dep.name}</Table.Td>
+                          <Table.Td>{dep.version}</Table.Td>
+                        </Table.Tr>
+                      ))
+                    )}
+                  </Table.Tbody>
+                </Table>
+              </Stack>
+            </Collapse>
+          </>
         ) : (
           <Group justify="center">
             <Loader size="sm" />
