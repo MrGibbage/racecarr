@@ -1,4 +1,5 @@
 import httpx
+from loguru import logger
 
 from ..models.entities import Indexer
 
@@ -13,12 +14,15 @@ def test_indexer_connection(indexer: Indexer) -> tuple[bool, str]:
     params: dict[str, str] = {"t": "caps"}
     if indexer.api_key:
         params["apikey"] = indexer.api_key
+    logger.debug("Testing indexer caps", name=indexer.name, url=url)
     try:
         resp = httpx.get(url, params=params, timeout=10)
     except httpx.RequestError as exc:
+        logger.warning("Indexer caps request failed", name=indexer.name, url=url, error=str(exc))
         return False, f"Request failed: {exc}"
 
     if resp.status_code != 200:
+        logger.warning("Indexer caps non-200", name=indexer.name, status=resp.status_code)
         return False, f"HTTP {resp.status_code} from indexer"
 
     content_type = (resp.headers.get("content-type") or "").lower()
@@ -37,24 +41,31 @@ def test_indexer_connection(indexer: Indexer) -> tuple[bool, str]:
         if isinstance(data, dict) and data.get("error"):
             return False, f"Indexer error: {data.get('error')}"
         if not has_caps:
+            logger.warning("Indexer JSON without caps", name=indexer.name)
             return False, "JSON response without caps"
 
     if not has_caps:
+        logger.warning("Indexer response missing caps", name=indexer.name)
         return False, "Unexpected response from indexer (no caps)"
 
     # If API key is provided, perform a lightweight authenticated search to validate the key.
     if indexer.api_key:
+        logger.debug("Testing indexer search with API key", name=indexer.name)
         search_params = {"t": "search", "q": "f1", "limit": 1, "apikey": indexer.api_key}
         try:
             search_resp = httpx.get(url, params=search_params, timeout=10)
         except httpx.RequestError as exc:
+            logger.warning("Indexer search request failed", name=indexer.name, error=str(exc))
             return False, f"Search request failed: {exc}"
         if search_resp.status_code != 200:
+            logger.warning("Indexer search non-200", name=indexer.name, status=search_resp.status_code)
             return False, f"HTTP {search_resp.status_code} from indexer search"
         search_text = search_resp.text.lower() if search_resp.text else ""
         if "<error" in search_text or ("apikey" in search_text and "invalid" in search_text):
             return False, "Indexer search reports API key invalid"
         if "text/html" in (search_resp.headers.get("content-type") or "").lower():
+            logger.warning("Indexer search returned HTML", name=indexer.name)
             return False, "HTML response on search; API key may be invalid"
 
+    logger.debug("Indexer test succeeded", name=indexer.name)
     return True, "Caps retrieved"

@@ -221,6 +221,7 @@ Tabs include:
   - Logs  
   - Config files  
 - Reverse proxy optional (Traefik, Nginx Proxy Manager, Caddy)
+- Frontend bundle (and package manifest for About dependency display) baked into the image
 
 ## 3.4 Container & Ops Defaults  
 - Base image: python:3.12-slim (install Node for frontend build stage or multi-stage build)  
