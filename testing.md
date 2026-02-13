@@ -51,9 +51,10 @@
 - [x] Search against real indexer returns normalized results
 - [ ] Scoring/filters apply (season/round/session/quality) per design
 - [ ] Fan-out query set respects maxage/category settings
+- [ ] Event-type allowlist hides disabled sessions and blocks them from manual/auto sends.
 
 ### Downloaders
-- [ ] Add SABnzbd/NZBGet downloader and test connection
+- [X] Add SABnzbd/NZBGet downloader and test connection
 - [ ] “Send to downloader” from a search result creates a job in downloader
 - [ ] Status polling shows queue/completed/failed items
 
