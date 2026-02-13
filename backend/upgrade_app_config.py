@@ -15,6 +15,7 @@ def ensure_columns():
         ("preferred_groups", "VARCHAR"),
         ("auto_download_threshold", "INTEGER"),
         ("default_downloader_id", "INTEGER"),
+        ("event_allowlist", "VARCHAR"),
     ]
     added = []
     with eng.begin() as conn:
