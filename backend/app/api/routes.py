@@ -23,6 +23,10 @@ from ..schemas.common import (
     SeasonDetail,
     SearchResult,
     CachedSearchResponse,
+    SearchSettings,
+    AutoGrabRequest,
+    AutoGrabResponse,
+    AutoGrabSelection,
     LogEntry,
     IndexerCreate,
     IndexerUpdate,
@@ -56,7 +60,16 @@ from ..services.auth import (
     update_password,
     AuthSession,
 )
-from ..services.app_config import get_app_config, set_log_level
+from ..services.app_config import (
+    get_app_config,
+    set_log_level,
+    get_search_settings,
+    update_search_settings,
+    DEFAULT_MIN_RES,
+    DEFAULT_MAX_RES,
+    DEFAULT_ALLOW_HDR,
+    DEFAULT_AUTO_DOWNLOAD_THRESHOLD,
+)
 
 router = APIRouter()
 
@@ -173,6 +186,25 @@ def update_log_level(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     log_response("log_level_updated", level=cfg.log_level)
     return LogLevelResponse(log_level=cfg.log_level)
+
+
+@router.get("/settings/search", response_model=SearchSettings)
+def get_search_settings_endpoint(
+    auth: AuthSession = Depends(require_auth), session: Session = Depends(get_session)
+) -> SearchSettings:
+    cfg = get_search_settings(session)
+    return cfg
+
+
+@router.post("/settings/search", response_model=SearchSettings)
+def update_search_settings_endpoint(
+    payload: SearchSettings,
+    auth: AuthSession = Depends(require_auth),
+    session: Session = Depends(get_session),
+) -> SearchSettings:
+    cfg = update_search_settings(session, payload)
+    log_response("search_settings_updated")
+    return cfg
 
 
 def _gather_backend_dependencies() -> list[DependencyVersion]:
@@ -391,6 +423,90 @@ def _query_variants(q: str) -> list[str]:
             add_variant(" ".join(swapped))
 
     return variants
+
+
+def _extract_resolution(text: str) -> int | None:
+    match = re.search(r"(\d{3,4})p", text, re.IGNORECASE)
+    if match:
+        try:
+            return int(match.group(1))
+        except ValueError:
+            return None
+    return None
+
+
+def _detect_hdr(text: str) -> bool:
+    return bool(re.search(r"\bhdr\b|\bhlg\b", text, re.IGNORECASE))
+
+
+def _detect_codec(text: str) -> str | None:
+    lowered = text.lower()
+    if "hevc" in lowered or "h265" in lowered or "x265" in lowered:
+        return "hevc"
+    if "h264" in lowered or "x264" in lowered:
+        return "h264"
+    return None
+
+
+def _score_result(item: SearchResult, cfg: SearchSettings) -> None:
+    score = 0
+    reasons: list[str] = []
+    quality_text = f"{item.title} {item.quality}"
+    res = _extract_resolution(quality_text)
+    if res:
+        if res < cfg.min_resolution or res > cfg.max_resolution:
+            reasons.append(f"Resolution {res}p outside {cfg.min_resolution}-{cfg.max_resolution}")
+            score = max(0, score - 100)
+        else:
+            res_span = max(1, cfg.max_resolution - cfg.min_resolution)
+            score += 30
+            score += int(20 * (res - cfg.min_resolution) / res_span)
+            reasons.append(f"Resolution {res}p in range")
+    hdr = _detect_hdr(quality_text)
+    if hdr:
+        if cfg.allow_hdr:
+            score += 5
+            reasons.append("HDR/HLG allowed")
+        else:
+            score = max(0, score - 40)
+            reasons.append("HDR/HLG not allowed")
+    codec = _detect_codec(quality_text)
+    if codec and cfg.preferred_codecs and codec in {c.lower() for c in cfg.preferred_codecs}:
+        score += 8
+        reasons.append(f"Preferred codec {codec}")
+    if cfg.preferred_groups:
+        lower_title = item.title.lower()
+        for grp in cfg.preferred_groups:
+            if grp.lower() in lower_title:
+                score += 10
+                reasons.append(f"Preferred group {grp}")
+                break
+    # Age decay: newer gets more points up to 20.
+    score += max(0, 20 - item.age_days)
+    reasons.append(f"Age {item.age_days} days")
+
+    weights = {
+        "race": 25,
+        "qualifying": 18,
+        "sprint": 18,
+        "sprint-qualifying": 15,
+        "fp1": 8,
+        "fp2": 8,
+        "fp3": 8,
+        "other": 5,
+    }
+    evt = (item.event_type or "other").lower()
+    score += weights.get(evt, 3)
+    reasons.append(f"Event weight {weights.get(evt, 3)} for {evt}")
+
+    item.score = max(0, min(int(score), 100))
+    item.score_reasons = reasons
+
+
+def _apply_scoring(results: list[SearchResult], cfg: SearchSettings) -> list[SearchResult]:
+    for item in results:
+        _score_result(item, cfg)
+    return results
 
 
 def _build_event_queries(year: int, round_name: str, round_number: int, event_type: str) -> list[str]:
@@ -621,8 +737,10 @@ def search(
             seen_global.add(key)
             all_results.append(item)
 
-    # Basic sort: newest first (age_days ascending), then size desc
-    all_results.sort(key=lambda r: (r.age_days, -r.size_mb))
+    cfg = get_search_settings(session)
+    _apply_scoring(all_results, cfg)
+    # Basic sort: score desc, then newest first (age_days ascending), then size desc
+    all_results.sort(key=lambda r: (-(r.score or 0), r.age_days, -r.size_mb))
     type_counts = Counter(r.event_type or "unknown" for r in all_results)
     elapsed_ms = int((perf_counter() - search_start) * 1000)
     log_response(
@@ -732,6 +850,8 @@ def search_round(
             results = [SearchResult(**item) for item in payload]
         except Exception:
             results = []
+        cfg = get_search_settings(session)
+        _apply_scoring(results, cfg)
         log_response("search_round_cache_hit", round_id=round_id, count=len(results))
         return CachedSearchResponse(results=results, from_cache=True, cached_at=cache.cached_at, ttl_hours=24)
 
@@ -740,6 +860,8 @@ def search_round(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No enabled indexers")
 
     results = _search_round_events(round_obj.season, round_obj, indexers, limit_per_query=50)
+    cfg = get_search_settings(session)
+    _apply_scoring(results, cfg)
 
     # Upsert cache row
     serialized = _serialize_results(results)
@@ -759,6 +881,102 @@ def search_round(
         indexers=len(indexers),
     )
     return CachedSearchResponse(results=results, from_cache=False, cached_at=cache.cached_at, ttl_hours=24)
+
+
+@router.post("/rounds/{round_id}/autograb", response_model=AutoGrabResponse)
+def auto_grab_round(
+    round_id: int,
+    payload: AutoGrabRequest,
+    session: Session = Depends(get_session),
+    auth: AuthSession = Depends(require_auth),
+) -> AutoGrabResponse:
+    round_obj: Round | None = session.query(Round).options(selectinload(Round.events), selectinload(Round.season)).filter_by(id=round_id).first()
+    if not round_obj or not round_obj.season:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Round not found")
+
+    cfg = get_search_settings(session)
+    if payload.threshold is not None:
+        cfg.auto_download_threshold = payload.threshold
+    if payload.downloader_id is not None:
+        cfg.default_downloader_id = payload.downloader_id
+
+    downloader: Downloader | None = None
+    if cfg.default_downloader_id:
+        downloader = session.query(Downloader).filter_by(id=cfg.default_downloader_id, enabled=True).first()
+    if not downloader:
+        downloader = session.query(Downloader).filter_by(enabled=True).order_by(Downloader.id.asc()).first()
+    if not downloader:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No enabled downloaders")
+
+    # Fetch results (respect cache unless force specified)
+    cache: CachedSearch | None = session.query(CachedSearch).filter_by(round_id=round_id).first()
+    ttl = timedelta(hours=24)
+    now = datetime.utcnow()
+    results: list[SearchResult] = []
+    if cache and not payload.force and cache.cached_at and now - cache.cached_at <= ttl:
+        try:
+            payload_json = json.loads(cache.results_json)
+            results = [SearchResult(**item) for item in payload_json]
+        except Exception:
+            results = []
+    else:
+        indexers = session.query(Indexer).filter_by(enabled=True).order_by(Indexer.name.asc()).all()
+        if not indexers:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No enabled indexers")
+        results = _search_round_events(round_obj.season, round_obj, indexers, limit_per_query=50)
+        serialized = json.dumps([r.model_dump() for r in results])
+        if cache:
+            cache.results_json = serialized
+            cache.cached_at = now
+        else:
+            cache = CachedSearch(round_id=round_id, cached_at=now, results_json=serialized)
+            session.add(cache)
+        session.commit()
+
+    _apply_scoring(results, cfg)
+
+    threshold = cfg.auto_download_threshold or DEFAULT_AUTO_DOWNLOAD_THRESHOLD
+    target_types = {et.lower() for et in payload.event_types} if payload.event_types else None
+
+    best_by_label: dict[str, SearchResult] = {}
+    for item in results:
+        label = item.event_label or (item.event_type or "Other").title()
+        if target_types and (item.event_type or "other").lower() not in target_types:
+            continue
+        if item.score is None or item.score < threshold:
+            continue
+        existing = best_by_label.get(label)
+        if existing is None or (item.score or 0) > (existing.score or 0):
+            best_by_label[label] = item
+
+    sent: list[AutoGrabSelection] = []
+    skipped: list[str] = []
+
+    for label, item in best_by_label.items():
+        if not item.nzb_url:
+            skipped.append(f"Missing NZB for {label}: {item.title}")
+            continue
+        ok, message = send_to_downloader(
+            downloader,
+            nzb_url=item.nzb_url,
+            title=item.title,
+            category=downloader.category,
+            priority=downloader.priority,
+        )
+        if ok:
+            sent.append(
+                AutoGrabSelection(
+                    title=item.title,
+                    event_label=label,
+                    score=item.score,
+                    downloader_id=downloader.id,
+                )
+            )
+        else:
+            skipped.append(f"{label}: {message}")
+
+    log_response("auto_grab_round", round_id=round_id, sent=len(sent), skipped=len(skipped))
+    return AutoGrabResponse(sent=sent, skipped=skipped)
 
 
 def _tail_lines(path: Path, max_lines: int = 50) -> Iterable[str]:

@@ -57,6 +57,7 @@ Shows at-a-glance information:
 - When not using demo data, default season list to current year and previous year; user can configure a start year to limit how far back seasons are loaded (API goes to 1950)
  - UI time display supports a user-selectable time zone override (defaults to browser local) alongside UTC; track-local shown when available
  - “Search all events” performs one round-level query across enabled indexers, caches results for 24 hours (with a reload override), and filters results by round/year + event type. Filters include the “big seven” plus “Other”.
+ - “Auto download best” respects the selected filter: All sends the top-scoring item per event, a specific event sends only that event, and “Other” disables the button. It uses the score threshold/default downloader from Settings → Search & Quality.
 
 ## 2.4 Event Detail Screen  
 - All metadata for the round  

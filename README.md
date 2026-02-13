@@ -49,6 +49,11 @@ Backend listens on 8000 in dev. Frontend dev server runs on 5173; API base resol
 ## Frontend
 Vite + React + Mantine. Pages: Dashboard, Search, Settings, Logs. Proxy to backend on `/api` during `npm run dev`.
 
+## Search & auto-download
+- Round search (Dashboard → “Search all events”) caches results for 24h; use Reload to bypass the cache.
+- Event filter buttons show the big seven plus Other; All shows everything for the round.
+- “Auto download best” respects the current filter: All sends the top-scoring item per event, a specific event sends only that event, and Other disables the button. Threshold/default downloader come from Settings → Search & Quality.
+
 ## Docker
 
 ```sh

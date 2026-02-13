@@ -80,6 +80,16 @@ type AboutResponse = {
   server_started_at?: string;
 };
 
+type SearchSettings = {
+  min_resolution: number;
+  max_resolution: number;
+  allow_hdr: boolean;
+  preferred_codecs: string[];
+  preferred_groups: string[];
+  auto_download_threshold: number;
+  default_downloader_id: number | null;
+};
+
 const stopKeyProp = (e: React.KeyboardEvent<HTMLInputElement>) => {
   e.stopPropagation();
   e.nativeEvent.stopImmediatePropagation?.();
@@ -137,6 +147,21 @@ const blockNavigationKeys = (event: KeyboardEvent) => {
   }
 };
 
+const parseCsvList = (raw: string) => raw.split(",").map((part) => part.trim()).filter(Boolean);
+
+const baseResolutionOptions = [
+  { value: "720", label: "720p" },
+  { value: "1080", label: "1080p" },
+  { value: "2160", label: "2160p (4K)" },
+];
+
+const resolutionOptions = (current: number | null | undefined) => {
+  if (current && !baseResolutionOptions.some((opt) => opt.value === String(current))) {
+    return [{ value: String(current), label: `${current}p (custom)` }, ...baseResolutionOptions];
+  }
+  return baseResolutionOptions;
+};
+
 export function Settings() {
   const [indexers, setIndexers] = useState<Indexer[]>([]);
   const [loading, setLoading] = useState(false);
@@ -178,6 +203,9 @@ export function Settings() {
   const [logLevelLoading, setLogLevelLoading] = useState(false);
   const [about, setAbout] = useState<AboutResponse | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [searchSettings, setSearchSettings] = useState<SearchSettings | null>(null);
+  const [searchSettingsLoading, setSearchSettingsLoading] = useState(false);
+  const [searchSettingsSaving, setSearchSettingsSaving] = useState(false);
   const logLevels = [
     { value: "TRACE", label: "Trace" },
     { value: "DEBUG", label: "Debug" },
@@ -222,11 +250,27 @@ export function Settings() {
     }
   };
 
+  const loadSearchSettings = async () => {
+    setSearchSettingsLoading(true);
+    setError(null);
+    try {
+      const res = await apiFetch(`/settings/search`);
+      if (!res.ok) throw new Error(`Failed to load search settings (${res.status})`);
+      const data = (await res.json()) as SearchSettings;
+      setSearchSettings(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setSearchSettingsLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadIndexers();
     loadDownloaders();
     loadLogLevel();
     loadAbout();
+    loadSearchSettings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -501,6 +545,35 @@ export function Settings() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     }
+  };
+
+  const saveSearchSettings = async () => {
+    if (!searchSettings) return;
+    if (searchSettings.min_resolution > searchSettings.max_resolution) {
+      setError("Min resolution cannot exceed max resolution");
+      return;
+    }
+    setSearchSettingsSaving(true);
+    setError(null);
+    try {
+      const res = await apiFetch(`/settings/search`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(searchSettings),
+      });
+      if (!res.ok) throw new Error(`Failed to update search settings (${res.status})`);
+      const data = (await res.json()) as SearchSettings;
+      setSearchSettings(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setSearchSettingsSaving(false);
+    }
+  };
+
+  const updateCsvSetting = (key: "preferred_codecs" | "preferred_groups", raw: string) => {
+    const parsed = parseCsvList(raw);
+    setSearchSettings((prev) => (prev ? { ...prev, [key]: parsed } : prev));
   };
 
   const copyAbout = async () => {
@@ -907,6 +980,114 @@ export function Settings() {
             Save log level
           </Button>
         </Group>
+      </Paper>
+
+      <Paper withBorder p="md">
+        <Title order={4} mb="sm">
+          Search & Quality
+        </Title>
+        <Text size="sm" c="dimmed" mb="sm">
+          Control scoring preferences and the auto-download threshold used on search results.
+        </Text>
+        {searchSettingsLoading ? (
+          <Group justify="center">
+            <Loader size="sm" />
+          </Group>
+        ) : searchSettings ? (
+          <Stack gap="sm">
+            <Group gap="sm" align="flex-end" wrap="wrap">
+              <Select
+                label="Min resolution"
+                data={resolutionOptions(searchSettings.min_resolution)}
+                value={String(searchSettings.min_resolution)}
+                onChange={(val) =>
+                  setSearchSettings((prev) =>
+                    prev ? { ...prev, min_resolution: val ? Number(val) : prev.min_resolution } : prev
+                  )
+                }
+                maw={180}
+                comboboxProps={{ withinPortal: true }}
+              />
+              <Select
+                label="Max resolution"
+                data={resolutionOptions(searchSettings.max_resolution)}
+                value={String(searchSettings.max_resolution)}
+                onChange={(val) =>
+                  setSearchSettings((prev) =>
+                    prev ? { ...prev, max_resolution: val ? Number(val) : prev.max_resolution } : prev
+                  )
+                }
+                maw={180}
+                comboboxProps={{ withinPortal: true }}
+              />
+              <NumberInput
+                label="Auto-download threshold"
+                description="Score required to auto-send the best result"
+                value={searchSettings.auto_download_threshold}
+                onChange={(val) =>
+                  setSearchSettings((prev) =>
+                    prev
+                      ? { ...prev, auto_download_threshold: typeof val === "number" ? val : prev.auto_download_threshold }
+                      : prev
+                  )
+                }
+                min={0}
+                max={200}
+                allowDecimal={false}
+                maw={220}
+              />
+            </Group>
+            <Group gap="sm" align="center" wrap="wrap">
+              <Switch
+                label="Allow HDR releases"
+                checked={searchSettings.allow_hdr}
+                onChange={(e) =>
+                  setSearchSettings((prev) => (prev ? { ...prev, allow_hdr: e.currentTarget.checked } : prev))
+                }
+              />
+              <Select
+                label="Default downloader"
+                placeholder="Use first enabled"
+                data={downloaders.map((dl) => ({ value: String(dl.id), label: dl.name }))}
+                value={searchSettings.default_downloader_id ? String(searchSettings.default_downloader_id) : null}
+                onChange={(val) =>
+                  setSearchSettings((prev) =>
+                    prev ? { ...prev, default_downloader_id: val ? Number(val) : null } : prev
+                  )
+                }
+                clearable
+                maw={240}
+                comboboxProps={{ withinPortal: true }}
+              />
+            </Group>
+            <Group gap="sm" align="flex-end" wrap="wrap">
+              <TextInput
+                label="Preferred codecs (comma-separated)"
+                placeholder="x265, HEVC, H.265"
+                value={searchSettings.preferred_codecs.join(", ")}
+                onChange={(e) => updateCsvSetting("preferred_codecs", e.currentTarget.value)}
+                maw={340}
+              />
+              <TextInput
+                label="Preferred release groups (comma-separated)"
+                placeholder="NTb, DON"
+                value={searchSettings.preferred_groups.join(", ")}
+                onChange={(e) => updateCsvSetting("preferred_groups", e.currentTarget.value)}
+                maw={340}
+              />
+            </Group>
+            <Group gap="sm">
+              <Button type="button" onClick={saveSearchSettings} loading={searchSettingsSaving}>
+                Save search settings
+              </Button>
+              <Button type="button" variant="light" onClick={loadSearchSettings} disabled={searchSettingsSaving}>
+                Reload
+              </Button>
+            </Group>
+          </Stack>
+        ) : (
+          <Text c="dimmed">Search settings could not be loaded.</Text>
+        )}
       </Paper>
 
       <Paper withBorder p="md">

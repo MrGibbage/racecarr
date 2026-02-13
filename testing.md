@@ -31,8 +31,9 @@
 > Note: frontend calls `VITE_API_URL` if provided, otherwise `http://localhost:8000/api`.
 
 ### Round search & caching
-- [ ] “Search all events” runs a single round-level query per indexer, respects 24h cache, and “Reload” bypasses cache
-- [ ] Results are filtered to the selected round by year/location; event filter buttons include the big seven plus “Other”; “All” shows everything for that round
+- [x] “Search all events” runs a single round-level query per indexer, respects 24h cache, and “Reload” bypasses cache
+- [x] Results are filtered to the selected round by year/location; event filter buttons include the big seven plus “Other”; “All” shows everything for that round
+- [x] Score column visible; auto-download best respects the event filter and sends top-scoring items above threshold; success/skip counts reported
 
 ### Settings / Auth
 - [x] Single-password auth: login flow, password change, session idle timeout (remember-me + logout)
@@ -46,8 +47,8 @@
 - [x] Navigate UI (Dashboard/Search/Logs) and confirm data renders
 
 ### Indexers & Search (real integrations)
-- [ ] Add/indexer settings form (NZBGeek/Newznab/Hydra2) saves and tests connection
-- [ ] Search against real indexer returns normalized results
+- [x] Add/indexer settings form (NZBGeek/Newznab/Hydra2) saves and tests connection
+- [x] Search against real indexer returns normalized results
 - [ ] Scoring/filters apply (season/round/session/quality) per design
 - [ ] Fan-out query set respects maxage/category settings
 
