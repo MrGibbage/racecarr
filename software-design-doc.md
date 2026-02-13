@@ -452,22 +452,25 @@ test_connection(...)
   - Event type (big seven only)
   - DateTime this search was added
   - DateTime last searched
-  - Periodicity (10 minutes, 6 hours, 24 hours)
+  - Periodicity (Future event, 10 minutes, 6 hours, 24 hours)
   - DateTime next search scheduled
   - RunWait status (any given search is either actually in-flight running, or it is waiting until the next scheduled search)
   - A button to Search now
   - A button to cancel/delete the task
+  - A button to edit the task
   - Min resolution
   - Max resolution
+  - Min search score required
+  - Other quality characteristics
 - Business rules/logic
   - Logic to prevent adding two of the same searches. Once an event is added to the watch list, we need to keep track of those events so they are never added again
   - Logic to make sure we don't try to search for an event while it is currently in-flight. Disable the search now button whenever a watchlist item is actually inflight searching. Similarly, if a user has clicked search now, and while that search is actually in-flight, if the scheduled search time happens, do not conduct a simultaneous search. Skip that timed search and wait for the next scheduled event. Do not try to reschedule missed events.
   - The main dashboard should have a badge for each event to indicate if that event is currently on the watchlist. If the event is not on the watchlist, there should instead be a button to add that event to the watchlist.
-  - All instant auto-searches will become a scheduled search event.
-    - If a user auto-searches for a race/round event that has occured, do a search for any titles available for download. If one is found and meets the min quality score, then download it and send it to the downloader. If none are found, then fallback to the schedule periodicity (10 min, 6 hour, 24 hour, depending on how recent the event was)
-    - If a user auto-searches for a future event, simply add it to the scheduler. When the time comes for that event, it will be downloaded once a search finds a sutiable match.
-  - All scheduled searches will occur in the background, without adversely affecting the UI experience
-  - Automatically remove an item from the watchlist once it has been downloaded from the downloader. Receive notification from the downloader to know when it has been downloaded.
+  - All instant auto-searches (from anywhere within the UI) will become a scheduled search event.
+    - If a user auto-searches for a race/round event that has occured, first add it to the watchlist. Next, do a search for any titles available for download. If one is found and meets the min quality score, then download it and send it to the downloader. If none are found, then fallback to the schedule periodicity (10 min, 6 hour, 24 hour, depending on how recent the event was)
+    - If a user auto-searches for a future event, simply add it to the watchlist. When the time comes for that event, it will be downloaded once a search finds a sutiable match.
+  - All scheduled searches will occur in background threads, without adversely affecting the UI experience
+  - Automatically remove an item from the watchlist once it has been downloaded from the downloader. Receive notification from the downloader to know when it has been downloaded. Popup a temporary toast notification in the UI to notify the user that an event has been downloaded.
 
 ## 6.2 Rule Evaluation  
 For each rule:
