@@ -471,6 +471,7 @@ test_connection(...)
     - If a user auto-searches for a future event, simply add it to the watchlist. When the time comes for that event, it will be downloaded once a search finds a sutiable match.
   - All scheduled searches will occur in background threads, without adversely affecting the UI experience
   - Automatically remove an item from the watchlist once it has been downloaded from the downloader. Receive notification from the downloader to know when it has been downloaded. Popup a temporary toast notification in the UI to notify the user that an event has been downloaded.
+  - Do not make any special efforts to accomadate the global event type allow list. For example, if a user has a search saved for an FP3 event, and then later changes the setting to ignore all FP3 events, just keep the FP3 event on the list. Similarly, if a user has a watch for all allowed event types which excluded FP3 events, and then later enables FP3 events, do not try to make special efforts to add the FP3 event to that round, or any rounds.
 
 ## 6.2 Rule Evaluation  
 For each rule:
