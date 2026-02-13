@@ -1,6 +1,6 @@
 import { AppShell, Burger, Group, NavLink, ScrollArea } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { IconHome, IconSearch, IconSettings, IconListDetails } from "@tabler/icons-react";
+import { IconHome, IconSearch, IconSettings, IconListDetails, IconClockHour4 } from "@tabler/icons-react";
 import { Link, Route, Routes, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { Dashboard } from "./pages/Dashboard";
@@ -9,11 +9,13 @@ import { Settings } from "./pages/Settings";
 import { Logs } from "./pages/Logs";
 import { NotFound } from "./pages/NotFound";
 import { Login } from "./pages/Login";
+import { Scheduler } from "./pages/Scheduler";
 import { apiFetch } from "./api";
 
 const navItems = [
   { label: "Dashboard", to: "/", icon: IconHome },
   { label: "Search", to: "/search", icon: IconSearch },
+  { label: "Scheduler", to: "/scheduler", icon: IconClockHour4 },
   { label: "Settings", to: "/settings", icon: IconSettings },
   { label: "Logs", to: "/logs", icon: IconListDetails }
 ];
@@ -69,6 +71,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/search" element={<Search />} />
+          <Route path="/scheduler" element={<Scheduler />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/logs" element={<Logs />} />
           <Route path="*" element={<NotFound />} />

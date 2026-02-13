@@ -46,8 +46,11 @@ from ..schemas.common import (
     LogLevelResponse,
     AboutResponse,
     DependencyVersion,
+    ScheduledSearchCreate,
+    ScheduledSearchOut,
+    DemoSeedResponse,
 )
-from ..models.entities import Season, Round, Indexer, Downloader, CachedSearch
+from ..models.entities import Season, Round, Event, Indexer, Downloader, CachedSearch, ScheduledSearch
 from ..services.f1api import refresh_season
 from ..services.indexer_client import test_indexer_connection, search_indexer
 from ..services.downloader_client import test_downloader_connection, send_to_downloader
@@ -98,6 +101,13 @@ def require_auth(request: Request, response: Response, session: Session = Depend
         path="/",
     )
     return auth_session
+
+
+def _get_scheduler(request: Request):
+    scheduler = getattr(request.app.state, "scheduler", None)
+    if scheduler is None:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Scheduler not initialized")
+    return scheduler
 
 
 @router.get("/healthz", response_model=HealthStatus)
@@ -370,6 +380,105 @@ def search_demo(auth: AuthSession = Depends(require_auth)) -> list[SearchResult]
     ]
     log_response("search_demo", count=len(results))
     return results
+
+
+@router.post("/demo/seed-scheduler", response_model=DemoSeedResponse)
+def seed_demo_scheduler(
+    request: Request,
+    create_searches: bool = True,
+    session: Session = Depends(get_session),
+    auth: AuthSession = Depends(require_auth),
+) -> DemoSeedResponse:
+    settings = get_settings()
+    if not settings.allow_demo_seed:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Demo seeding disabled")
+
+    now = datetime.utcnow()
+    season_year = now.year + 10
+
+    season = session.query(Season).filter_by(year=season_year).first()
+    if not season:
+        season = Season(year=season_year, last_refreshed=now)
+        session.add(season)
+        session.flush()
+
+    round_obj = (
+        session.query(Round)
+        .filter_by(season_id=season.id, round_number=99)
+        .first()
+    )
+    if not round_obj:
+        round_obj = Round(
+            season_id=season.id,
+            round_number=99,
+            name="Demo Grand Prix",
+            circuit="Demo Circuit",
+            country="Nowhere",
+        )
+        session.add(round_obj)
+        session.flush()
+
+    events_data = [
+        ("fp1", now - timedelta(hours=12)),
+        ("qualifying", now + timedelta(minutes=15)),
+        ("sprint", now + timedelta(minutes=60)),
+        ("race", now + timedelta(minutes=90)),
+    ]
+
+    events: list[str] = []
+    for ev_type, start_at in events_data:
+        end_at = start_at + timedelta(hours=2)
+        existing = next((ev for ev in round_obj.events if (ev.type or "").lower() == ev_type), None)
+        if existing:
+            existing.start_time_utc = start_at
+            existing.end_time_utc = end_at
+        else:
+            session.add(
+                Event(
+                    round_id=round_obj.id,
+                    type=ev_type,
+                    start_time_utc=start_at,
+                    end_time_utc=end_at,
+                )
+            )
+        events.append(ev_type)
+
+    session.commit()
+
+    scheduled_created: list[int] = []
+    scheduled_existing: list[int] = []
+    if create_searches:
+        scheduler = _get_scheduler(request)
+        target_types = ["race", "qualifying", "fp1"]
+        for ev_type in target_types:
+            existing = (
+                session.query(ScheduledSearch)
+                .filter_by(round_id=round_obj.id, event_type=ev_type)
+                .first()
+            )
+            if existing:
+                scheduled_existing.append(existing.id)
+                continue
+            payload = ScheduledSearchCreate(round_id=round_obj.id, event_type=ev_type)
+            created = scheduler.create_search(session, payload)
+            scheduled_created.append(created.id)
+
+    session.commit()
+    log_response(
+        "demo_seed_scheduler",
+        season_year=season_year,
+        events=len(events),
+        scheduled_created=len(scheduled_created),
+        scheduled_existing=len(scheduled_existing),
+    )
+
+    return DemoSeedResponse(
+        season_year=season_year,
+        round_id=round_obj.id,
+        events=events,
+        scheduled_created=scheduled_created,
+        scheduled_existing=scheduled_existing,
+    )
 
 
 def _normalize_query_text(q: str) -> str:
@@ -994,6 +1103,66 @@ def auto_grab_round(
 
     log_response("auto_grab_round", round_id=round_id, sent=len(sent), skipped=len(skipped))
     return AutoGrabResponse(sent=sent, skipped=skipped)
+
+
+@router.get("/scheduler/searches", response_model=list[ScheduledSearchOut])
+def list_scheduled_searches(
+    request: Request,
+    session: Session = Depends(get_session),
+    auth: AuthSession = Depends(require_auth),
+) -> list[ScheduledSearchOut]:
+    scheduler = _get_scheduler(request)
+    items = scheduler.list_searches(session)
+    log_response("scheduler_list", count=len(items))
+    return items
+
+
+@router.post("/scheduler/searches", response_model=ScheduledSearchOut)
+def create_scheduled_search(
+    payload: ScheduledSearchCreate,
+    request: Request,
+    session: Session = Depends(get_session),
+    auth: AuthSession = Depends(require_auth),
+) -> ScheduledSearchOut:
+    scheduler = _get_scheduler(request)
+    item = scheduler.create_search(session, payload)
+    log_response("scheduler_create", id=item.id, round_id=item.round_id, event_type=item.event_type)
+    return item
+
+
+@router.delete("/scheduler/searches/{search_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_scheduled_search(
+    search_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+    auth: AuthSession = Depends(require_auth),
+) -> None:
+    scheduler = _get_scheduler(request)
+    ok = scheduler.delete_search(session, search_id)
+    if not ok:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scheduled search not found")
+    log_response("scheduler_delete", id=search_id)
+    return None
+
+
+@router.post("/scheduler/searches/{search_id}/run", response_model=ScheduledSearchOut)
+async def run_scheduled_search(
+    search_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+    auth: AuthSession = Depends(require_auth),
+) -> ScheduledSearchOut:
+    scheduler = _get_scheduler(request)
+    exists: ScheduledSearch | None = session.query(ScheduledSearch).filter_by(id=search_id).first()
+    if not exists:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scheduled search not found")
+    await scheduler.run_now(search_id)
+    session.expire_all()
+    item: ScheduledSearch | None = session.query(ScheduledSearch).filter_by(id=search_id).first()
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scheduled search not found")
+    log_response("scheduler_run_now", id=search_id, status=item.status)
+    return item
 
 
 def _tail_lines(path: Path, max_lines: int = 50) -> Iterable[str]:

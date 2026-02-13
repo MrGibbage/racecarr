@@ -49,14 +49,14 @@
 ### Indexers & Search (real integrations)
 - [x] Add/indexer settings form (NZBGeek/Newznab/Hydra2) saves and tests connection
 - [x] Search against real indexer returns normalized results
-- [ ] Scoring/filters apply (season/round/session/quality) per design
-- [ ] Fan-out query set respects maxage/category settings
-- [ ] Event-type allowlist hides disabled sessions and blocks them from manual/auto sends.
+- [X] Scoring/filters apply (season/round/session/quality) per design
+- [X] Fan-out query set respects maxage/category settings
+- [X] Event-type allowlist hides disabled sessions and blocks them from manual/auto sends.
 
 ### Downloaders
 - [X] Add SABnzbd/NZBGet downloader and test connection
-- [ ] “Send to downloader” from a search result creates a job in downloader
-- [ ] Status polling shows queue/completed/failed items
+- [X] “Send to downloader” from a search result creates a job in downloader
+- [ ] Status polling shows queue/completed/failed items (save for a later build)
 
 ### Scheduler / Refresh
 - [ ] Scheduler tick runs on interval, refreshes current season from f1api.dev

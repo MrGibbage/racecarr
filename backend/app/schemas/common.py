@@ -231,3 +231,36 @@ class AboutResponse(BaseModel):
     github_url: str | None = None
     git_sha: str | None = None
     server_started_at: str | None = None
+
+
+class ScheduledSearchCreate(BaseModel):
+    round_id: int
+    event_type: str
+    downloader_id: int | None = None
+
+
+class ScheduledSearchOut(BaseModel):
+    id: int
+    round_id: int
+    event_type: str
+    status: str
+    added_at: datetime
+    last_searched_at: datetime | None = None
+    next_run_at: datetime | None = None
+    last_error: str | None = None
+    tag: str | None = None
+    nzb_title: str | None = None
+    nzb_url: str | None = None
+    downloader_id: int | None = None
+    attempts: int = 0
+
+    class Config:
+        from_attributes = True
+
+
+class DemoSeedResponse(BaseModel):
+    season_year: int
+    round_id: int
+    events: list[str]
+    scheduled_created: list[int] = Field(default_factory=list)
+    scheduled_existing: list[int] = Field(default_factory=list)

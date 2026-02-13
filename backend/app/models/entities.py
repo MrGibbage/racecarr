@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Text
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 from ..core.database import Base
 
@@ -82,3 +82,25 @@ class CachedSearch(Base):
     round_id = Column(Integer, ForeignKey("round.id"), nullable=False, index=True)
     cached_at = Column(DateTime, nullable=False)
     results_json = Column(Text, nullable=False)
+
+
+class ScheduledSearch(Base):
+    __tablename__ = "scheduled_search"
+    __table_args__ = (
+        UniqueConstraint("round_id", "event_type", name="uq_scheduled_round_event"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    round_id = Column(Integer, ForeignKey("round.id"), nullable=False)
+    event_type = Column(String, nullable=False)
+    status = Column(String, nullable=False, default="pending")
+    added_at = Column(DateTime, nullable=False)
+    last_searched_at = Column(DateTime, nullable=True)
+    next_run_at = Column(DateTime, nullable=True)
+    last_error = Column(String, nullable=True)
+    tag = Column(String, nullable=True)
+    nzb_title = Column(String, nullable=True)
+    nzb_url = Column(String, nullable=True)
+    downloader_id = Column(Integer, ForeignKey("downloader.id"), nullable=True)
+    event_start_utc = Column(DateTime, nullable=True)
+    attempts = Column(Integer, nullable=False, default=0)

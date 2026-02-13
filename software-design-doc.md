@@ -443,6 +443,7 @@ test_connection(...)
   - Reduce to every 6 hours after 48 hours
   - Reduce to every 24 hours after 168 hours; Continue until download is found or until canceled by the user.
 - **Concurrency limits:** cap concurrent indexer calls (e.g., 3 in-flight) and serialize per-indexer to respect polite use; back off with exponential retry on HTTP/timeouts.  
+- **Download completion (poll-first, webhook later):** Tag downloads we send (e.g., `rc-{roundId}-{eventType}` or category label) and persist that tag. A background poll against downloader history (SAB/NZBGet) every ~10 minutes matches tagged jobs and marks scheduled items completed/failed; use a recent time window to keep calls light. Webhook/callback endpoint can be added later; polling stays as fallback.
 - **Tasks include:** refresh current season data, evaluate watch rules, search for events in scope, trigger downloads, update download statuses, send notifications.  
 - **Scheduler Screen** Link on home page/dashboard to the scheduler screen. Scheduler screen features a large sortable & filterable table of all events that are currently scheduled. At the top there is a button to quick-add all future events of a certain type within a season to the watchlist (for example, all upcoming races & qualifications for the 2026 season). 
 - Columns include:
@@ -472,6 +473,8 @@ test_connection(...)
   - All scheduled searches will occur in background threads, without adversely affecting the UI experience
   - Automatically remove an item from the watchlist once it has been downloaded from the downloader. Receive notification from the downloader to know when it has been downloaded. Popup a temporary toast notification in the UI to notify the user that an event has been downloaded.
   - Do not make any special efforts to accomadate the global event type allow list. For example, if a user has a search saved for an FP3 event, and then later changes the setting to ignore all FP3 events, just keep the FP3 event on the list. Similarly, if a user has a watch for all allowed event types which excluded FP3 events, and then later enables FP3 events, do not try to make special efforts to add the FP3 event to that round, or any rounds.
+  - UI implementation: Scheduler table polls every ~15 seconds for status updates and disables run/delete while an item is running or waiting for downloader completion.
+  - Dev/demo helper: when `ALLOW_DEMO_SEED=true` (backend) and `VITE_ALLOW_DEMO_SEED=true` (frontend), a `/api/demo/seed-scheduler` endpoint and UI button create a fake future season/round with nearby event times plus sample scheduled searches for exercising the scheduler without real calendar events.
 
 ## 6.2 Rule Evaluation  
 For each rule:
