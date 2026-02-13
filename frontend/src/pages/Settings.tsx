@@ -18,6 +18,7 @@ import {
   Collapse,
   ActionIcon,
   Tooltip,
+  Checkbox,
 } from "@mantine/core";
 import { IconCopy } from "@tabler/icons-react";
 import { apiFetch } from "../api";
@@ -88,6 +89,7 @@ type SearchSettings = {
   preferred_groups: string[];
   auto_download_threshold: number;
   default_downloader_id: number | null;
+  event_allowlist: string[];
 };
 
 const stopKeyProp = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -161,6 +163,17 @@ const resolutionOptions = (current: number | null | undefined) => {
   }
   return baseResolutionOptions;
 };
+
+const eventTypeOptions = [
+  { value: "race", label: "Race" },
+  { value: "qualifying", label: "Qualifying" },
+  { value: "sprint", label: "Sprint" },
+  { value: "sprint-qualifying", label: "Sprint Qualifying" },
+  { value: "fp1", label: "FP1" },
+  { value: "fp2", label: "FP2" },
+  { value: "fp3", label: "FP3" },
+  { value: "other", label: "Other" },
+];
 
 export function Settings() {
   const [indexers, setIndexers] = useState<Indexer[]>([]);
@@ -1037,6 +1050,18 @@ export function Settings() {
                 maw={220}
               />
             </Group>
+            <Checkbox.Group
+              label="Allowed event types"
+              description="Unchecked types are hidden and never sent (manual or automatic)"
+              value={searchSettings.event_allowlist || []}
+              onChange={(vals) => setSearchSettings((prev) => (prev ? { ...prev, event_allowlist: vals } : prev))}
+            >
+              <Group gap="sm">
+                {eventTypeOptions.map((opt) => (
+                  <Checkbox key={opt.value} value={opt.value} label={opt.label} />
+                ))}
+              </Group>
+            </Checkbox.Group>
             <Group gap="sm" align="center" wrap="wrap">
               <Switch
                 label="Allow HDR releases"

@@ -16,6 +16,7 @@ DEFAULT_MIN_RES = 720
 DEFAULT_MAX_RES = 2160
 DEFAULT_ALLOW_HDR = True
 DEFAULT_AUTO_DOWNLOAD_THRESHOLD = 50
+DEFAULT_EVENT_ALLOWLIST = ["race", "qualifying", "sprint", "sprint-qualifying", "fp1", "fp2", "fp3"]
 
 
 def _normalize_level(level: str) -> LogLevel:
@@ -42,6 +43,9 @@ def ensure_app_config(session: Session) -> AppConfig:
         if row.auto_download_threshold is None:
             row.auto_download_threshold = DEFAULT_AUTO_DOWNLOAD_THRESHOLD
             changed = True
+        if not row.event_allowlist:
+            row.event_allowlist = _join_csv(DEFAULT_EVENT_ALLOWLIST)
+            changed = True
         if changed:
             session.commit()
             session.refresh(row)
@@ -54,6 +58,7 @@ def ensure_app_config(session: Session) -> AppConfig:
         max_resolution=DEFAULT_MAX_RES,
         allow_hdr=DEFAULT_ALLOW_HDR,
         auto_download_threshold=DEFAULT_AUTO_DOWNLOAD_THRESHOLD,
+        event_allowlist=_join_csv(DEFAULT_EVENT_ALLOWLIST),
     )
     session.add(row)
     session.commit()
@@ -87,6 +92,7 @@ def _join_csv(items: list[str]) -> str:
 
 def get_search_settings(session: Session) -> SearchSettings:
     row = ensure_app_config(session)
+    allowlist = [et.lower() for et in _split_csv(row.event_allowlist)] or [et.lower() for et in DEFAULT_EVENT_ALLOWLIST]
     return SearchSettings(
         min_resolution=row.min_resolution or DEFAULT_MIN_RES,
         max_resolution=row.max_resolution or DEFAULT_MAX_RES,
@@ -95,6 +101,7 @@ def get_search_settings(session: Session) -> SearchSettings:
         preferred_groups=_split_csv(row.preferred_groups),
         auto_download_threshold=row.auto_download_threshold or DEFAULT_AUTO_DOWNLOAD_THRESHOLD,
         default_downloader_id=row.default_downloader_id,
+        event_allowlist=allowlist,
     )
 
 
@@ -107,6 +114,8 @@ def update_search_settings(session: Session, payload: SearchSettings) -> SearchS
     row.preferred_groups = _join_csv(payload.preferred_groups)
     row.auto_download_threshold = payload.auto_download_threshold
     row.default_downloader_id = payload.default_downloader_id
+    normalized_allowlist = [et.lower() for et in payload.event_allowlist]
+    row.event_allowlist = _join_csv(normalized_allowlist)
     session.commit()
     session.refresh(row)
     return get_search_settings(session)

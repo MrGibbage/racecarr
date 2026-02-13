@@ -69,6 +69,7 @@ from ..services.app_config import (
     DEFAULT_MAX_RES,
     DEFAULT_ALLOW_HDR,
     DEFAULT_AUTO_DOWNLOAD_THRESHOLD,
+    DEFAULT_EVENT_ALLOWLIST,
 )
 
 router = APIRouter()
@@ -637,7 +638,7 @@ _EVENT_TYPE_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ),
 ]
 
-_DEFAULT_EVENT_ALLOWLIST = {"race", "qualifying", "sprint", "sprint-qualifying", "fp1", "fp2", "fp3"}
+_DEFAULT_EVENT_ALLOWLIST = set(DEFAULT_EVENT_ALLOWLIST)
 
 
 def _classify_event_type(title: str) -> str | None:
@@ -648,28 +649,34 @@ def _classify_event_type(title: str) -> str | None:
     return None
 
 
-def _build_event_allowlist(event_types: list[str] | None) -> set[str]:
+def _build_event_allowlist(event_types: list[str] | None, base_allowlist: set[str]) -> set[str]:
+    base = set(base_allowlist) if base_allowlist else set(_DEFAULT_EVENT_ALLOWLIST)
     if event_types:
         normalized = {et.strip().lower() for et in event_types if et and et.strip()}
         if normalized:
-            return normalized
-    return set(_DEFAULT_EVENT_ALLOWLIST)
+            capped = normalized & base if base else normalized
+            return capped
+    return set(base)
 
 
-def _derive_event_allowlist(query: str, event_types: list[str] | None) -> set[str]:
+def _derive_event_allowlist(query: str, event_types: list[str] | None, base_allowlist: set[str]) -> set[str]:
     """Resolve the allowlist from explicit params or by inferring from the query itself."""
-    explicit = _build_event_allowlist(event_types)
+    explicit = _build_event_allowlist(event_types, base_allowlist)
     inferred = _classify_event_type(query)
 
     # If the caller explicitly provided event_types, respect them.
     if event_types:
         # But if they passed the full default set, narrow to the inferred type when possible.
         if inferred and explicit == set(_DEFAULT_EVENT_ALLOWLIST):
+            if explicit and inferred not in explicit:
+                return set()
             return {inferred}
         return explicit
 
     # No explicit allowlist: infer from the query when possible.
     if inferred:
+        if explicit and inferred not in explicit:
+            return set()
         return {inferred}
     return explicit
 
@@ -715,12 +722,14 @@ def search(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Query is required")
 
     limit = max(1, min(limit, 50))
+    cfg = get_search_settings(session)
     indexers = session.query(Indexer).filter_by(enabled=True).order_by(Indexer.name.asc()).all()
     if not indexers:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No enabled indexers")
 
     variants = _query_variants(query)
-    allowlist = _derive_event_allowlist(query, event_types)
+    base_allowlist = set(cfg.event_allowlist or _DEFAULT_EVENT_ALLOWLIST)
+    allowlist = _derive_event_allowlist(query, event_types, base_allowlist)
     all_results: list[SearchResult] = []
     seen_global: set[str | tuple[str, str]] = set()
     search_start = perf_counter()
@@ -737,7 +746,6 @@ def search(
             seen_global.add(key)
             all_results.append(item)
 
-    cfg = get_search_settings(session)
     _apply_scoring(all_results, cfg)
     # Basic sort: score desc, then newest first (age_days ascending), then size desc
     all_results.sort(key=lambda r: (-(r.score or 0), r.age_days, -r.size_mb))
@@ -760,6 +768,7 @@ def _search_round_events(
     season: Season,
     round_obj: Round,
     indexers: list[Indexer],
+    allowlist: set[str],
     limit_per_query: int = 50,
 ) -> list[SearchResult]:
     results: list[SearchResult] = []
@@ -804,6 +813,8 @@ def _search_round_events(
             for item in batch:
                 evt_type = _classify_event_type(item.title) or "other"
                 item.event_type = evt_type
+                if allowlist and evt_type not in allowlist:
+                    continue
                 label = schedule_labels.get(evt_type)
                 if not label:
                     label = "Other"
@@ -841,6 +852,8 @@ def search_round(
     if not round_obj.season:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Round missing season context")
 
+    cfg = get_search_settings(session)
+    allowlist = set(cfg.event_allowlist or _DEFAULT_EVENT_ALLOWLIST)
     ttl = timedelta(hours=24)
     cache: CachedSearch | None = session.query(CachedSearch).filter_by(round_id=round_id).first()
     now = datetime.utcnow()
@@ -850,17 +863,16 @@ def search_round(
             results = [SearchResult(**item) for item in payload]
         except Exception:
             results = []
-        cfg = get_search_settings(session)
-        _apply_scoring(results, cfg)
-        log_response("search_round_cache_hit", round_id=round_id, count=len(results))
-        return CachedSearchResponse(results=results, from_cache=True, cached_at=cache.cached_at, ttl_hours=24)
+        filtered = [r for r in results if (r.event_type or "other").lower() in allowlist]
+        _apply_scoring(filtered, cfg)
+        log_response("search_round_cache_hit", round_id=round_id, count=len(filtered))
+        return CachedSearchResponse(results=filtered, from_cache=True, cached_at=cache.cached_at, ttl_hours=24)
 
     indexers = session.query(Indexer).filter_by(enabled=True).order_by(Indexer.name.asc()).all()
     if not indexers:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No enabled indexers")
 
-    results = _search_round_events(round_obj.season, round_obj, indexers, limit_per_query=50)
-    cfg = get_search_settings(session)
+    results = _search_round_events(round_obj.season, round_obj, indexers, allowlist, limit_per_query=50)
     _apply_scoring(results, cfg)
 
     # Upsert cache row
@@ -895,6 +907,7 @@ def auto_grab_round(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Round not found")
 
     cfg = get_search_settings(session)
+    allowlist = set(cfg.event_allowlist or _DEFAULT_EVENT_ALLOWLIST)
     if payload.threshold is not None:
         cfg.auto_download_threshold = payload.threshold
     if payload.downloader_id is not None:
@@ -923,7 +936,7 @@ def auto_grab_round(
         indexers = session.query(Indexer).filter_by(enabled=True).order_by(Indexer.name.asc()).all()
         if not indexers:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No enabled indexers")
-        results = _search_round_events(round_obj.season, round_obj, indexers, limit_per_query=50)
+        results = _search_round_events(round_obj.season, round_obj, indexers, allowlist, limit_per_query=50)
         serialized = json.dumps([r.model_dump() for r in results])
         if cache:
             cache.results_json = serialized
@@ -933,15 +946,19 @@ def auto_grab_round(
             session.add(cache)
         session.commit()
 
-    _apply_scoring(results, cfg)
+    filtered_results = [r for r in results if (r.event_type or "other").lower() in allowlist]
+    _apply_scoring(filtered_results, cfg)
 
     threshold = cfg.auto_download_threshold or DEFAULT_AUTO_DOWNLOAD_THRESHOLD
     target_types = {et.lower() for et in payload.event_types} if payload.event_types else None
+    if target_types is not None:
+        target_types = target_types & allowlist if allowlist else target_types
 
     best_by_label: dict[str, SearchResult] = {}
-    for item in results:
+    for item in filtered_results:
+        event_type = (item.event_type or "other").lower()
         label = item.event_label or (item.event_type or "Other").title()
-        if target_types and (item.event_type or "other").lower() not in target_types:
+        if target_types and event_type not in target_types:
             continue
         if item.score is None or item.score < threshold:
             continue

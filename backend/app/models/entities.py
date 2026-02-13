@@ -73,6 +73,7 @@ class AppConfig(Base):
     preferred_groups = Column(String, nullable=True)
     auto_download_threshold = Column(Integer, nullable=True)
     default_downloader_id = Column(Integer, nullable=True)
+    event_allowlist = Column(String, nullable=True)
 
 
 class CachedSearch(Base):

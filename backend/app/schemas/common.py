@@ -193,6 +193,9 @@ class SearchSettings(BaseModel):
     preferred_groups: list[str] = Field(default_factory=list)
     auto_download_threshold: int = 50
     default_downloader_id: int | None = None
+    event_allowlist: list[str] = Field(
+        default_factory=lambda: ["race", "qualifying", "sprint", "sprint-qualifying", "fp1", "fp2", "fp3"]
+    )
 
 
 class AutoGrabRequest(BaseModel):
