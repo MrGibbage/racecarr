@@ -59,6 +59,8 @@ class SearchResult(BaseModel):
     nzb_url: str | None = None
     event_type: str | None = None
     event_label: str | None = None
+    score: int | None = None
+    score_reasons: list[str] | None = None
 
 
 class LogEntry(BaseModel):
@@ -181,6 +183,35 @@ class LogLevelRequest(BaseModel):
 
 class LogLevelResponse(BaseModel):
     log_level: str
+
+
+class SearchSettings(BaseModel):
+    min_resolution: int = 720
+    max_resolution: int = 2160
+    allow_hdr: bool = True
+    preferred_codecs: list[str] = Field(default_factory=list)
+    preferred_groups: list[str] = Field(default_factory=list)
+    auto_download_threshold: int = 50
+    default_downloader_id: int | None = None
+
+
+class AutoGrabRequest(BaseModel):
+    threshold: int | None = None
+    downloader_id: int | None = None
+    event_types: list[str] | None = None
+    force: bool = False
+
+
+class AutoGrabSelection(BaseModel):
+    title: str
+    event_label: str | None = None
+    score: int | None = None
+    downloader_id: int
+
+
+class AutoGrabResponse(BaseModel):
+    sent: list[AutoGrabSelection] = Field(default_factory=list)
+    skipped: list[str] = Field(default_factory=list)
 
 
 class DependencyVersion(BaseModel):

@@ -50,6 +50,20 @@ type SearchResult = {
   nzb_url?: string | null;
   event_type?: string | null;
   event_label?: string | null;
+  score?: number | null;
+  score_reasons?: string[] | null;
+};
+
+type AutoGrabSelection = {
+  title: string;
+  event_label?: string | null;
+  score?: number | null;
+  downloader_id: number;
+};
+
+type AutoGrabResponse = {
+  sent: AutoGrabSelection[];
+  skipped: string[];
 };
 
 type CachedSearchResponse = {
@@ -102,6 +116,7 @@ export function Dashboard() {
   const [searchDrawerOpen, setSearchDrawerOpen] = useState(false);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [autoMessage, setAutoMessage] = useState<string | null>(null);
   const [searchTitle, setSearchTitle] = useState<string>("");
   const [selectedEventFilter, setSelectedEventFilter] = useState<string | null>(null);
   const [usingCache, setUsingCache] = useState<boolean>(false);
@@ -223,6 +238,7 @@ export function Dashboard() {
     setSearchDrawerOpen(true);
     setSearching(true);
     setSearchError(null);
+    setAutoMessage(null);
     setSearchResults([]);
     setUsingCache(false);
     setCachedAt(null);
@@ -263,6 +279,51 @@ export function Dashboard() {
     await handleRoundSearch(season, round, false);
   };
 
+  const autoDownloadBest = async () => {
+    if (!activeRound) return;
+    setSearchError(null);
+    setAutoMessage(null);
+
+    const normalizedFilter = selectedEventFilter?.toLowerCase();
+    const eventTypesForFilter =
+      normalizedFilter && normalizedFilter !== "other"
+        ? Array.from(
+            new Set(
+              searchResults
+                .filter((r) => {
+                  const label = (r.event_label || "Other").toLowerCase();
+                  const type = (r.event_type || "").toLowerCase();
+                  return label === normalizedFilter || type === normalizedFilter;
+                })
+                .map((r) => (r.event_type || "").toLowerCase())
+                .filter(Boolean)
+            )
+          )
+        : [];
+
+    const payload: Record<string, unknown> = { force: true };
+    if (eventTypesForFilter.length) {
+      payload.event_types = eventTypesForFilter;
+    } else if (normalizedFilter && normalizedFilter !== "other") {
+      payload.event_types = [normalizedFilter];
+    }
+
+    try {
+      const res = await apiFetch(`/rounds/${activeRound.round.id}/autograb`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error(`Auto-download failed (${res.status})`);
+      const data = (await res.json()) as AutoGrabResponse;
+      const sentCount = data.sent.length;
+      const skippedCount = data.skipped.length;
+      setAutoMessage(`Auto-downloaded ${sentCount} item(s); skipped ${skippedCount}.`);
+    } catch (err) {
+      setSearchError(err instanceof Error ? err.message : "Auto-download failed");
+    }
+  };
+
   useEffect(() => {
     fetchSeasons();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -274,6 +335,14 @@ export function Dashboard() {
         return label === selectedEventFilter.toLowerCase();
       })
     : searchResults;
+
+  const normalizedFilter = selectedEventFilter?.toLowerCase();
+  const autoDownloadLabel = !selectedEventFilter
+    ? "Auto download best each event"
+    : normalizedFilter === "other"
+      ? "Auto download best"
+      : `Auto download best ${selectedEventFilter}`;
+  const autoDownloadDisabled = searching || normalizedFilter === "other";
 
   const renderEvents = (season: Season, round: Round) => {
     if (!round.events?.length) return <Text c="dimmed" size="sm">No events yet.</Text>;
@@ -448,6 +517,11 @@ export function Dashboard() {
               {searchError}
             </Alert>
           )}
+          {autoMessage && (
+            <Alert color="green" title="Auto download" variant="light">
+              {autoMessage}
+            </Alert>
+          )}
           {usingCache && (
             <Alert color="yellow" title="Using cached results" variant="light">
               <Group justify="space-between" align="center">
@@ -473,29 +547,39 @@ export function Dashboard() {
             </Group>
           ) : searchResults.length ? (
             <Stack gap="xs">
-              <Group gap="xs" align="center">
-                <Text size="sm" c="dimmed">
-                  Filter by event:
-                </Text>
+              <Group justify="space-between" align="center">
+                <Group gap="xs" align="center">
+                  <Text size="sm" c="dimmed">
+                    Filter by event:
+                  </Text>
+                  <Button
+                    size="xs"
+                    variant={selectedEventFilter ? "subtle" : "filled"}
+                    onClick={() => setSelectedEventFilter(null)}
+                  >
+                    All
+                  </Button>
+                  {Array.from(
+                    new Set(searchResults.map((r) => r.event_label || "Other").filter(Boolean))
+                  ).map((ev) => (
+                    <Button
+                      key={ev as string}
+                      size="xs"
+                      variant={selectedEventFilter === ev ? "filled" : "subtle"}
+                      onClick={() => setSelectedEventFilter(ev as string)}
+                    >
+                      {ev}
+                    </Button>
+                  ))}
+                </Group>
                 <Button
                   size="xs"
-                  variant={selectedEventFilter ? "subtle" : "filled"}
-                  onClick={() => setSelectedEventFilter(null)}
+                  variant="filled"
+                  onClick={autoDownloadBest}
+                  disabled={autoDownloadDisabled}
                 >
-                  All
+                  {autoDownloadLabel}
                 </Button>
-                {Array.from(
-                  new Set(searchResults.map((r) => r.event_label || "Other").filter(Boolean))
-                ).map((ev) => (
-                  <Button
-                    key={ev as string}
-                    size="xs"
-                    variant={selectedEventFilter === ev ? "filled" : "subtle"}
-                    onClick={() => setSelectedEventFilter(ev as string)}
-                  >
-                    {ev}
-                  </Button>
-                ))}
               </Group>
               <ScrollArea h="65vh" offsetScrollbars>
                 <Table striped highlightOnHover withColumnBorders stickyHeader>
@@ -507,6 +591,7 @@ export function Dashboard() {
                       <Table.Th>Quality</Table.Th>
                       <Table.Th ta="right">Size (MB)</Table.Th>
                       <Table.Th ta="right">Age (days)</Table.Th>
+                      <Table.Th ta="right">Score</Table.Th>
                       <Table.Th>NZB</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
@@ -523,6 +608,7 @@ export function Dashboard() {
                         </Table.Td>
                         <Table.Td ta="right">{row.size_mb.toLocaleString()}</Table.Td>
                         <Table.Td ta="right">{row.age_days}</Table.Td>
+                        <Table.Td ta="right">{row.score ?? "–"}</Table.Td>
                         <Table.Td>
                           {row.nzb_url ? (
                             <a href={row.nzb_url} target="_blank" rel="noreferrer">

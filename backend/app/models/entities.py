@@ -66,6 +66,13 @@ class AppConfig(Base):
     __tablename__ = "app_config"
     id = Column(Integer, primary_key=True)
     log_level = Column(String, nullable=False)
+    min_resolution = Column(Integer, nullable=True)
+    max_resolution = Column(Integer, nullable=True)
+    allow_hdr = Column(Boolean, nullable=True)
+    preferred_codecs = Column(String, nullable=True)
+    preferred_groups = Column(String, nullable=True)
+    auto_download_threshold = Column(Integer, nullable=True)
+    default_downloader_id = Column(Integer, nullable=True)
 
 
 class CachedSearch(Base):
