@@ -152,7 +152,7 @@ Tabs include:
   - Select default profile; allow per-search override before sending to downloader.  
 - **Search & Scoring**  
   - Toggle fan-out query set; maxage window; auto-grab score threshold; advanced scoring weight tweaks.  
-  - Event-type filters list (MVP): user-toggleable allowlist covering the “big seven” (Race, Qualifying, Sprint, Sprint Qualifying, FP1, FP2, FP3) plus “Other” for miscellaneous sessions (press conferences, F1 Live, shows). Allowlist is applied to search results, scoring, and auto-grab/rule evaluation; non-allowed types are filtered out by default.  
+  - Event-type filters list (MVP): user-toggleable allowlist covering the “big seven” (Race, Qualifying, Sprint, Sprint Qualifying, FP1, FP2, FP3) plus “Other” for miscellaneous sessions (press conferences, F1 Live, shows). Allowlist is applied to search results, scoring, and auto-grab/rule evaluation; non-allowed types are filtered out by default, hidden in the UI, and never sent to downloaders (manual or automatic).  
 - **Scheduler**  
   - Tick interval; jitter toggle; aggressive/decay cadence windows; stop-after-days; concurrency cap per indexer.  
 - **Notifications**  

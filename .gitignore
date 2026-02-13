@@ -33,3 +33,6 @@ htmlcov/
 
 # Docker
 config/
+
+# Auth/session artifacts
+cookies.txt
