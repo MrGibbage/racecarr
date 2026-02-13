@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Badge,
@@ -73,6 +73,34 @@ type CachedSearchResponse = {
   ttl_hours: number;
 };
 
+type SearchSettings = {
+  event_allowlist?: string[];
+};
+
+type ScheduledSearch = {
+  id: number;
+  round_id: number;
+  event_type: string;
+  status: string;
+  next_run_at?: string | null;
+};
+
+const DEFAULT_EVENT_ALLOWLIST = [
+  "race",
+  "qualifying",
+  "sprint",
+  "sprint-qualifying",
+  "fp1",
+  "fp2",
+  "fp3",
+];
+
+const normalizeEventType = (value?: string | null) => {
+  const normalized = (value || "").trim().toLowerCase();
+  if (!normalized) return "other";
+  return normalized.replace(/\s+/g, "-");
+};
+
 const utcFormatter = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
   month: "short",
@@ -123,6 +151,23 @@ export function Dashboard() {
   const [cachedAt, setCachedAt] = useState<string | null>(null);
   const [activeRound, setActiveRound] = useState<{ season: Season; round: Round } | null>(null);
   const [pendingFilter, setPendingFilter] = useState<string | null>(null);
+  const [eventAllowlist, setEventAllowlist] = useState<string[] | null>(null);
+  const [scheduledSearches, setScheduledSearches] = useState<ScheduledSearch[]>([]);
+  const [watchlistMap, setWatchlistMap] = useState<Record<string, ScheduledSearch>>({});
+  const [addingWatch, setAddingWatch] = useState<Record<string, boolean>>({});
+
+  const resolvedAllowlist = useMemo(
+    () =>
+      new Set(
+        (eventAllowlist?.length ? eventAllowlist : DEFAULT_EVENT_ALLOWLIST).map((et) => et.toLowerCase())
+      ),
+    [eventAllowlist]
+  );
+
+  const filterEventsByAllowlist = (events?: Event[]) =>
+    (events || []).filter((ev) => resolvedAllowlist.has(normalizeEventType(ev.type)));
+
+  const watchKey = (roundId: number, eventType: string) => `${roundId}-${normalizeEventType(eventType)}`;
 
   const ensureStateForSeasons = (items: Season[]) => {
     setExpandedSeasons((prev) => {
@@ -195,6 +240,37 @@ export function Dashboard() {
     }
   };
 
+  const fetchScheduledSearches = async () => {
+    try {
+      const res = await apiFetch(`/scheduler/searches`);
+      if (!res.ok) throw new Error(`Failed to load scheduler (${res.status})`);
+      const data = (await res.json()) as ScheduledSearch[];
+      setScheduledSearches(data);
+      const map: Record<string, ScheduledSearch> = {};
+      data.forEach((item) => {
+        map[watchKey(item.round_id, item.event_type)] = item;
+      });
+      setWatchlistMap(map);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load scheduler");
+    }
+  };
+
+  const fetchEventAllowlist = async () => {
+    try {
+      const res = await apiFetch(`/settings/search`);
+      if (!res.ok) throw new Error(`Failed to load search settings (${res.status})`);
+      const data = (await res.json()) as SearchSettings;
+      const allowlist = data.event_allowlist && data.event_allowlist.length
+        ? data.event_allowlist.map((et) => et.toLowerCase())
+        : DEFAULT_EVENT_ALLOWLIST;
+      setEventAllowlist(allowlist);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load search settings");
+      setEventAllowlist(DEFAULT_EVENT_ALLOWLIST);
+    }
+  };
+
   const toggleSeason = (season: Season) => {
     const nextExpanded = !isSeasonExpanded(season.id);
     setExpandedSeasons((prev) => ({ ...prev, [season.id]: nextExpanded }));
@@ -232,8 +308,9 @@ export function Dashboard() {
   };
 
   const handleRoundSearch = async (season: Season, round: Round, force = false) => {
-    const pastEvents = (round.events || []).filter(isPastEvent);
-    setActiveRound({ season, round });
+    const visibleEvents = filterEventsByAllowlist(round.events);
+    const pastEvents = visibleEvents.filter(isPastEvent);
+    setActiveRound({ season, round: { ...round, events: visibleEvents } });
     setSearchTitle(`Search: Round ${round.round_number} · ${round.name}`);
     setSearchDrawerOpen(true);
     setSearching(true);
@@ -242,6 +319,11 @@ export function Dashboard() {
     setSearchResults([]);
     setUsingCache(false);
     setCachedAt(null);
+    if (!visibleEvents.length) {
+      setSearchError("No events allowed by the current filter.");
+      setSearching(false);
+      return;
+    }
     if (!pastEvents.length) {
       setSearchError("No completed events to search yet.");
       setSearching(false);
@@ -277,6 +359,40 @@ export function Dashboard() {
     }
     setPendingFilter(ev.type);
     await handleRoundSearch(season, round, false);
+  };
+
+  const addToWatchlist = async (round: Round, ev: Event) => {
+    const key = watchKey(round.id ?? 0, ev.type);
+    setAddingWatch((prev) => ({ ...prev, [key]: true }));
+    try {
+      const res = await apiFetch(`/scheduler/searches`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          round_id: round.id,
+          event_type: normalizeEventType(ev.type),
+        }),
+      });
+      if (!res.ok) throw new Error(`Failed to add to watchlist (${res.status})`);
+      const data = (await res.json()) as ScheduledSearch;
+      if (isPastEvent(ev)) {
+        // For past events, kick off an immediate search once, then let cadence take over.
+        await apiFetch(`/scheduler/searches/${data.id}/run`, { method: "POST" });
+      }
+      setScheduledSearches((prev) => {
+        const merged = prev.filter((p) => p.id !== data.id).concat(data);
+        const map: Record<string, ScheduledSearch> = {};
+        merged.forEach((item) => {
+          map[watchKey(item.round_id, item.event_type)] = item;
+        });
+        setWatchlistMap(map);
+        return merged;
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add to watchlist");
+    } finally {
+      setAddingWatch((prev) => ({ ...prev, [key]: false }));
+    }
   };
 
   const autoDownloadBest = async () => {
@@ -325,7 +441,9 @@ export function Dashboard() {
   };
 
   useEffect(() => {
+    fetchEventAllowlist();
     fetchSeasons();
+    fetchScheduledSearches();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -345,10 +463,13 @@ export function Dashboard() {
   const autoDownloadDisabled = searching || normalizedFilter === "other";
 
   const renderEvents = (season: Season, round: Round) => {
-    if (!round.events?.length) return <Text c="dimmed" size="sm">No events yet.</Text>;
+    const visibleEvents = filterEventsByAllowlist(round.events);
+    if (!visibleEvents.length) {
+      return <Text c="dimmed" size="sm">All events are hidden by the allowed event types.</Text>;
+    }
     return (
       <Stack gap={4}>
-        {round.events.map((ev, idx) => (
+        {visibleEvents.map((ev, idx) => (
           <Group key={`${round.round_number}-${ev.type}-${idx}`} gap="xs" align="center">
             <Badge color="blue" variant="light" size="sm">
               {ev.type}
@@ -361,6 +482,27 @@ export function Dashboard() {
                   <Text size="sm" c="dimmed">{formatted.utc}</Text>
                   <Text size="sm" c="dimmed">{formatted.local}</Text>
                 </Stack>
+              );
+            })()}
+            {(() => {
+              const key = watchKey(round.id ?? 0, ev.type);
+              const scheduled = watchlistMap[key];
+              if (scheduled) {
+                return (
+                  <Badge color="teal" variant="light" size="sm">
+                    Watchlist
+                  </Badge>
+                );
+              }
+              return (
+                <Button
+                  size="xs"
+                  variant="outline"
+                  onClick={() => addToWatchlist(round, ev)}
+                  loading={addingWatch[key]}
+                >
+                  Add to watchlist
+                </Button>
               );
             })()}
             {isPastEvent(ev) && (
@@ -420,7 +562,7 @@ export function Dashboard() {
                       size="xs"
                       variant="subtle"
                       onClick={() => handleRoundSearch(season, rnd)}
-                      disabled={searching}
+                      disabled={searching || !filterEventsByAllowlist(rnd.events).length}
                     >
                       Search all events
                     </Button>

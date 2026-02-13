@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     f1api_base_url: str = Field("https://f1api.dev", validation_alias="F1API_BASE_URL")
     scheduler_tick_seconds: int = Field(600, validation_alias="SCHEDULER_TICK_SECONDS")
     enable_scheduler: bool = Field(True, validation_alias="ENABLE_SCHEDULER")
+    allow_demo_seed: bool = Field(False, validation_alias="ALLOW_DEMO_SEED")
     auth_secret: str = Field("changeme-secret", validation_alias="AUTH_SECRET")
     auth_session_days: int = Field(1, validation_alias="AUTH_SESSION_DAYS")
     auth_remember_days: int = Field(30, validation_alias="AUTH_REMEMBER_DAYS")
