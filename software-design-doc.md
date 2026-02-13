@@ -1,7 +1,7 @@
 # 1. **Overview & Goals**
 
 ## 1.1 Purpose  
-This application helps users **find, monitor, and download Formula One race events from Usenet** using their own indexers and download clients. It follows the architectural and UX patterns of Sonarr/Radarr, adapted for motorsport events instead of TV episodes.
+This application helps users **find, monitor, and download Formula One race events from Usenet** using their own indexers and download clients. It follows the architectural and UX patterns of Sonarr/Radarr, adapted for motorsport events instead of TV episodes. Sonarr is not able to reliably download F1 races because they do not follow the normal S01E01 episode numbering. This application will instead use specific F1 characteristics to greatly improve and automate the downloading of F1 races.
 
 ## 1.2 High‑Level Concept  
 - Users interact through a **web UI** (desktop‑first, responsive-friendly).  
@@ -439,10 +439,35 @@ test_connection(...)
 - **Global tick:** every 10 minutes (configurable). Add ±2 minute jitter to avoid thundering herd.  
 - **Search cadence for an event:**  
   - Start searching 30 minutes after scheduled start time of the session.  
-  - Aggressive window: every tick (10 minutes) for the first 24 hours after start.  
-  - Decay window: every 6 hours after 48 hours; stop automatic searches after 14 days unless manually triggered.  
+  - Aggressive window: every tick (10 minutes) for the first 48 hours after start.  
+  - Reduce to every 6 hours after 48 hours
+  - Reduce to every 24 hours after 168 hours; Continue until download is found or until canceled by the user.
 - **Concurrency limits:** cap concurrent indexer calls (e.g., 3 in-flight) and serialize per-indexer to respect polite use; back off with exponential retry on HTTP/timeouts.  
 - **Tasks include:** refresh current season data, evaluate watch rules, search for events in scope, trigger downloads, update download statuses, send notifications.  
+- **Scheduler Screen** Link on home page/dashboard to the scheduler screen. Scheduler screen features a large sortable & filterable table of all events that are currently scheduled. At the top there is a button to quick-add all future events of a certain type within a season to the watchlist (for example, all upcoming races & qualifications for the 2026 season). 
+- Columns include:
+  - Year
+  - Round
+  - Round title
+  - Event type (big seven only)
+  - DateTime this search was added
+  - DateTime last searched
+  - Periodicity (10 minutes, 6 hours, 24 hours)
+  - DateTime next search scheduled
+  - RunWait status (any given search is either actually in-flight running, or it is waiting until the next scheduled search)
+  - A button to Search now
+  - A button to cancel/delete the task
+  - Min resolution
+  - Max resolution
+- Business rules/logic
+  - Logic to prevent adding two of the same searches. Once an event is added to the watch list, we need to keep track of those events so they are never added again
+  - Logic to make sure we don't try to search for an event while it is currently in-flight. Disable the search now button whenever a watchlist item is actually inflight searching. Similarly, if a user has clicked search now, and while that search is actually in-flight, if the scheduled search time happens, do not conduct a simultaneous search. Skip that timed search and wait for the next scheduled event. Do not try to reschedule missed events.
+  - The main dashboard should have a badge for each event to indicate if that event is currently on the watchlist. If the event is not on the watchlist, there should instead be a button to add that event to the watchlist.
+  - All instant auto-searches will become a scheduled search event.
+    - If a user auto-searches for a race/round event that has occured, do a search for any titles available for download. If one is found and meets the min quality score, then download it and send it to the downloader. If none are found, then fallback to the schedule periodicity (10 min, 6 hour, 24 hour, depending on how recent the event was)
+    - If a user auto-searches for a future event, simply add it to the scheduler. When the time comes for that event, it will be downloaded once a search finds a sutiable match.
+  - All scheduled searches will occur in the background, without adversely affecting the UI experience
+  - Automatically remove an item from the watchlist once it has been downloaded from the downloader. Receive notification from the downloader to know when it has been downloaded.
 
 ## 6.2 Rule Evaluation  
 For each rule:
