@@ -1564,4 +1564,18 @@ def send_to_downloader_route(
         priority=payload.priority if payload.priority is not None else item.priority,
     )
     log_response("send_to_downloader", id=downloader_id, ok=ok)
+    if ok:
+        try:
+            targets = list_notification_targets(session)
+            if targets:
+                send_notifications(
+                    targets,
+                    message=f"Download started: {payload.title} ({item.name})",
+                    title="Racecarr",
+                    event="download-start",
+                    data={"title": payload.title, "downloader": item.name},
+                )
+        except Exception:
+            # Notification failures should not fail the send API
+            pass
     return DownloaderSendResult(ok=ok, message=message)
