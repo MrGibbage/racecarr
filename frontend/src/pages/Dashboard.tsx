@@ -9,6 +9,7 @@ import {
   Group,
   Loader,
   NumberInput,
+  Select,
   ScrollArea,
   Stack,
   Table,
@@ -66,6 +67,11 @@ type AutoGrabSelection = {
 type AutoGrabResponse = {
   sent: AutoGrabSelection[];
   skipped: string[];
+};
+
+type Downloader = {
+  id: number;
+  name: string;
 };
 
 type CachedSearchResponse = {
@@ -166,6 +172,9 @@ export function Dashboard() {
   const [scheduledSearches, setScheduledSearches] = useState<ScheduledSearch[]>([]);
   const [watchlistMap, setWatchlistMap] = useState<Record<string, ScheduledSearch>>({});
   const [addingWatch, setAddingWatch] = useState<Record<string, boolean>>({});
+  const [downloaders, setDownloaders] = useState<Downloader[]>([]);
+  const [selectedDownloaderId, setSelectedDownloaderId] = useState<string | null>(null);
+  const [sending, setSending] = useState<Record<string, boolean>>({});
 
   const resolvedAllowlist = useMemo(
     () =>
@@ -290,6 +299,20 @@ export function Dashboard() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load search settings");
       setEventAllowlist(DEFAULT_EVENT_ALLOWLIST);
+    }
+  };
+
+  const loadDownloaders = async () => {
+    try {
+      const res = await apiFetch(`/downloaders`);
+      if (!res.ok) throw new Error(`Failed to load downloaders (${res.status})`);
+      const data = (await res.json()) as Downloader[];
+      setDownloaders(data);
+      if (!selectedDownloaderId && data.length) {
+        setSelectedDownloaderId(String(data[0].id));
+      }
+    } catch (err) {
+      // ignore; send button will alert if none are configured
     }
   };
 
@@ -535,6 +558,7 @@ export function Dashboard() {
     fetchEventAllowlist();
     fetchSeasons();
     fetchScheduledSearches();
+    loadDownloaders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageHydrated]);
 
@@ -668,6 +692,33 @@ export function Dashboard() {
           ))}
       </Stack>
     );
+  };
+
+  const sendToDownloader = async (row: SearchResult) => {
+    if (!row.nzb_url) {
+      alert("No NZB URL available for this item.");
+      return;
+    }
+    const downloaderId = selectedDownloaderId || (downloaders.length ? String(downloaders[0].id) : null);
+    if (!downloaderId) {
+      alert("Configure a downloader in Settings first.");
+      return;
+    }
+    setSending((prev) => ({ ...prev, [row.nzb_url as string]: true }));
+    try {
+      const res = await apiFetch(`/downloaders/${downloaderId}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nzb_url: row.nzb_url, title: row.title }),
+      });
+      if (!res.ok) throw new Error(`Send failed (${res.status})`);
+      const data = (await res.json()) as { ok: boolean; message: string };
+      alert(`${data.ok ? "Sent" : "Failed"}: ${data.message}`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Send failed");
+    } finally {
+      setSending((prev) => ({ ...prev, [row.nzb_url as string]: false }));
+    }
   };
 
   return (
@@ -894,6 +945,15 @@ export function Dashboard() {
                 >
                   {autoDownloadLabel}
                 </Button>
+                <Select
+                  placeholder="Select downloader"
+                  size="xs"
+                  data={downloaders.map((d) => ({ value: String(d.id), label: d.name }))}
+                  value={selectedDownloaderId}
+                  onChange={(val) => setSelectedDownloaderId(val)}
+                  maw={220}
+                  clearable
+                />
               </Group>
               <ScrollArea h="65vh" offsetScrollbars>
                 <Table striped highlightOnHover withColumnBorders stickyHeader>
@@ -906,7 +966,7 @@ export function Dashboard() {
                       <Table.Th ta="right">Size (MB)</Table.Th>
                       <Table.Th ta="right">Age (days)</Table.Th>
                       <Table.Th ta="right">Score</Table.Th>
-                      <Table.Th>NZB</Table.Th>
+                      <Table.Th>Actions</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
@@ -925,9 +985,20 @@ export function Dashboard() {
                         <Table.Td ta="right">{row.score ?? "–"}</Table.Td>
                         <Table.Td>
                           {row.nzb_url ? (
-                            <a href={row.nzb_url} target="_blank" rel="noreferrer">
-                              Download
-                            </a>
+                            <Stack gap={4} justify="flex-start" align="flex-start">
+                              <a href={row.nzb_url} target="_blank" rel="noreferrer">
+                                Download NZB
+                              </a>
+                              <Button
+                                size="xs"
+                                variant="light"
+                                onClick={() => sendToDownloader(row)}
+                                disabled={!selectedDownloaderId || !!sending[row.nzb_url]}
+                                loading={!!sending[row.nzb_url]}
+                              >
+                                Send to downloader
+                              </Button>
+                            </Stack>
                           ) : (
                             <Text size="sm" c="dimmed">
                               None
