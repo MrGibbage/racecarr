@@ -823,7 +823,7 @@ export function Dashboard() {
         onClose={() => setSearchDrawerOpen(false)}
         position="top"
         size="90vh"
-        title={searchTitle || "Event Details"}
+        title={<Text fw={700}>{searchTitle || "Event Details"}</Text>}
       >
         <Stack gap="sm">
           {searchError && (
