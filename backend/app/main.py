@@ -54,11 +54,23 @@ def _ensure_season_soft_delete() -> None:
         conn.execute(text("ALTER TABLE season ADD COLUMN is_deleted BOOLEAN DEFAULT 0"))
 
 
+def _ensure_notification_targets_column() -> None:
+    inspector = inspect(engine)
+    if "app_config" not in inspector.get_table_names():
+        return
+    cols = {col["name"] for col in inspector.get_columns("app_config")}
+    if "notification_targets" in cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE app_config ADD COLUMN notification_targets TEXT"))
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     _ensure_downloader_priority_column()
     _ensure_scheduled_search_overrides()
     _ensure_season_soft_delete()
+    _ensure_notification_targets_column()
     Base.metadata.create_all(bind=engine)
     with SessionLocal() as session:
         ensure_auth_row(session)

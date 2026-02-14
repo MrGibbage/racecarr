@@ -75,6 +75,7 @@ class AppConfig(Base):
     auto_download_threshold = Column(Integer, nullable=True)
     default_downloader_id = Column(Integer, nullable=True)
     event_allowlist = Column(String, nullable=True)
+    notification_targets = Column(Text, nullable=True)
 
 
 class CachedSearch(Base):
