@@ -552,7 +552,8 @@ export function Settings() {
       setPwdCurrent("");
       setPwdNew("");
       setPwdConfirm("");
-      alert("Password updated");
+      alert("Password updated. Please sign in again.");
+      await logout();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -1133,19 +1134,19 @@ export function Settings() {
             label="Current password"
             value={pwdCurrent}
             onChange={(e) => setPwdCurrent(e.currentTarget.value)}
-            maw={240}
+            w={300}
           />
           <PasswordInput
             label="New password"
             value={pwdNew}
             onChange={(e) => setPwdNew(e.currentTarget.value)}
-            maw={240}
+            w={300}
           />
           <PasswordInput
             label="Confirm new password"
             value={pwdConfirm}
             onChange={(e) => setPwdConfirm(e.currentTarget.value)}
-            maw={240}
+            w={300}
           />
           <Button type="button" onClick={changePassword} loading={pwdSaving} disabled={!pwdCurrent || !pwdNew || !pwdConfirm}>
             Update password

@@ -4,103 +4,52 @@
 ![Python](https://img.shields.io/badge/python-3.12+-blue)
 ![Frontend](https://img.shields.io/badge/frontend-Vite%2FReact%2FMantine-00b894)
 
-Skeleton implementation of the Racecarr app per the design doc.
+Racecarr is a small FastAPI + React app that searches F1 events across indexers and can auto-send matches to your downloader.
 
-## Quick start (dev)
+## Quick start
 
-```sh
-# backend
-cd backend
-uv sync --python "C:\Python312\python.exe"
-uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+- Requirements:
+  - Docker Desktop (Windows/macOS) or Docker Engine with the Compose plugin (Linux)
+  - Access to a Usenet indexer (Newznab/Hydra-style) and a downloader (SABnzbd, NZBGet, etc.)
+- Get the code (clone or download `docker-compose.yml`).
+- Ensure the `config` directory exists (stores the SQLite DB and logs).
+- From the repo root: `docker compose up --build`
+  - Linux: same command; ensure the Compose plugin is installed (`docker compose version`).
+- App URL: http://localhost:8080 (API at `/api`)
+- Default login: user `admin`, password `admin` — change it in Settings → Security.
 
-# frontend (separate terminal)
-Frontend
-Vite + React + Mantine. Pages: Dashboard, Manual Search, Scheduler, Settings, Logs. Proxy to backend on `/api` during `npm run dev`.
+## First run checklist
 
-Dashboard:
-- Add or refresh a season by year.
-- Hide seasons (soft delete) to remove them from the dashboard, dropdowns, and scheduler; restore hidden seasons from the Hidden panel.
-- Hard delete a season (and its rounds/events/watchlist entries) from the Hidden panel.
-- Expand/collapse seasons and rounds; expansion state persists in localStorage.
-- Run “Search all events” for a round; cached 24h, with Reload to bypass.
-
-Manual Search:
-- Enter a title with optional limit, allowlist toggle, and raw/bypass allowlist toggle; shows event labels when available.
-
-Scheduler page:
-- Lists scheduled searches with status badges, periodicity, downloader selection, and actions (run now/delete) with busy-state disabling.
-- Polls every 15s for live updates.
-- Quick-add lets you enqueue all future events of a type for a season; respects duplicates.
-- Demo button (when `VITE_ALLOW_DEMO_SEED=true`) seeds a fake season and scheduled searches via `/api/demo/seed-scheduler`.
-- Each watch entry supports pause/resume and per-entry overrides for downloader, resolution range, HDR allowance, and score threshold.
- - Hidden seasons’ watch entries are paused and excluded from listings; restoring the season resumes scheduling.
-
-Search & auto-download
-- Event filter buttons show the big seven plus Other; All shows everything for the round.
-- “Auto download best” respects the current filter: All sends the top-scoring item per event, a specific event sends only that event, and Other disables the button. Threshold/default downloader come from Settings → Search & Quality.
-## Authentication
-- Single-user password; default is seeded to `admin` on first start. Update it in Settings → Security.
-- Session cookie `rc_session` is httpOnly with remember-me and idle timeout refresh; login at `/login`.
-- Logout is available from Settings → Security (clears the cookie and returns to the login screen).
-
-## API
-- `GET /api/healthz`
-- `GET /api/readyz`
-- `POST /api/auth/login`
-- `POST /api/auth/logout`
-- `GET /api/auth/me`
-- `POST /api/auth/password`
-- `GET/POST /api/settings/log-level`
-- `GET /api/settings/about`
-- `GET/POST/DELETE /api/notifications/targets`
-- `POST /api/notifications/test`
-- `GET /api/seasons`
-- `POST/GET /api/demo-seasons`
-- `POST /api/seasons/{year}/refresh`
-- `POST /api/seasons/{year}/hide` (soft delete)
-- `POST /api/seasons/{year}/restore`
-- `DELETE /api/seasons/{year}` (hard delete; removes rounds/events/watchlist/cached searches)
- - `GET /api/search-demo`
- - `POST /api/demo/seed-scheduler`
- - `GET /api/logs`
- - `GET/POST /api/indexers`
- - `PUT/DELETE /api/indexers/{id}`
- - `POST /api/indexers/{id}/test`
- - `GET/POST /api/scheduler/searches`
-	- `PATCH /api/scheduler/searches/{id}` (downloader/status/quality overrides)
- - `DELETE /api/scheduler/searches/{id}`
- - `POST /api/scheduler/searches/{id}/run`
+- Add at least one indexer (Settings → Indexers) and test the connection.
+- Add a downloader (Settings → Downloaders) and test the connection.
+- From Dashboard, add or refresh a Formula One season by year; expand a round and click “Search all events.”
+- Send results manually from Search, or use “Auto download best” on a round.
 
 ## Notifications
-- Configure targets in Settings → Notifications (Apprise or webhook). Each target can select which events it listens to; new targets default to all events.
-- Implemented events: download-start, download-complete, download-fail (triggered when jobs are sent to the downloader and when polling detects completion/failure).
-- `/api/notifications/test` bypasses event filtering to verify connectivity.
 
-## Frontend
-Vite + React + Mantine. Pages: Dashboard, Search, Scheduler, Settings, Logs. Proxy to backend on `/api` during `npm run dev`.
+- Configure Apprise/webhook targets in Settings → Notifications.
+- Supported events: download-start, download-complete, download-fail.
+- Use “Send test” to verify the target; targets can opt in/out per event.
 
-Scheduler page:
-- Lists scheduled searches with status badges, periodicity, downloader selection, and actions (run now/delete) with busy-state disabling.
-- Polls every 15s for live updates.
-- Quick-add lets you enqueue all future events of a type for a season; respects duplicates.
-- Demo button (when `VITE_ALLOW_DEMO_SEED=true`) seeds a fake season and scheduled searches via `/api/demo/seed-scheduler`.
+## Developers
 
-## Search & auto-download
-- Round search (Dashboard → “Search all events”) caches results for 24h; use Reload to bypass the cache.
-- Event filter buttons show the big seven plus Other; All shows everything for the round.
-- “Auto download best” respects the current filter: All sends the top-scoring item per event, a specific event sends only that event, and Other disables the button. Threshold/default downloader come from Settings → Search & Quality.
+- For local dev, architecture notes, and full API details, see [dev.md](dev.md).
 
-## Docker
+## Docker compose (reference)
 
-```sh
-docker compose up --build
+If you just need the compose file, copy this into `docker-compose.yml` and run `docker compose up --build`:
+
+```yaml
+version: "3.9"
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config:/config
+    environment:
+      - LOG_LEVEL=INFO
+      - SQLITE_PATH=/config/data.db
+    command: ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]
 ```
-
-Container listens on 8080. Frontend is served at `/`, API at `/api/*`.
-
-## Notes
-- Static frontend is bundled into the backend image under `backend/app/static` and served by FastAPI in Docker.
-- Frontend package manifest is also baked into the image so the About page can display frontend dependency versions.
-- SQLite database at `/config/data.db` by default (config volume is mapped in compose).
-- Scheduler runs in-process on the backend; tick/poll interval defaults to 10 minutes (configurable via `SCHEDULER_TICK_SECONDS`).

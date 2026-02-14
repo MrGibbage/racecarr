@@ -1,7 +1,7 @@
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from sqlalchemy import inspect, text
 from .core.config import get_settings
 from .core.logging_config import configure_logging
@@ -65,12 +65,44 @@ def _ensure_notification_targets_column() -> None:
         conn.execute(text("ALTER TABLE app_config ADD COLUMN notification_targets TEXT"))
 
 
+def _ensure_app_config_columns() -> None:
+    inspector = inspect(engine)
+    if "app_config" not in inspector.get_table_names():
+        return
+    cols = {col["name"] for col in inspector.get_columns("app_config")}
+    alter_statements: list[str] = []
+    if "min_resolution" not in cols:
+        alter_statements.append("ALTER TABLE app_config ADD COLUMN min_resolution INTEGER")
+    if "max_resolution" not in cols:
+        alter_statements.append("ALTER TABLE app_config ADD COLUMN max_resolution INTEGER")
+    if "allow_hdr" not in cols:
+        alter_statements.append("ALTER TABLE app_config ADD COLUMN allow_hdr BOOLEAN")
+    if "preferred_codecs" not in cols:
+        alter_statements.append("ALTER TABLE app_config ADD COLUMN preferred_codecs TEXT")
+    if "preferred_groups" not in cols:
+        alter_statements.append("ALTER TABLE app_config ADD COLUMN preferred_groups TEXT")
+    if "auto_download_threshold" not in cols:
+        alter_statements.append("ALTER TABLE app_config ADD COLUMN auto_download_threshold INTEGER")
+    if "default_downloader_id" not in cols:
+        alter_statements.append("ALTER TABLE app_config ADD COLUMN default_downloader_id INTEGER")
+    if "event_allowlist" not in cols:
+        alter_statements.append("ALTER TABLE app_config ADD COLUMN event_allowlist TEXT")
+    if "notification_targets" not in cols:
+        alter_statements.append("ALTER TABLE app_config ADD COLUMN notification_targets TEXT")
+
+    if not alter_statements:
+        return
+    with engine.begin() as conn:
+        for stmt in alter_statements:
+            conn.execute(text(stmt))
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     _ensure_downloader_priority_column()
     _ensure_scheduled_search_overrides()
     _ensure_season_soft_delete()
-    _ensure_notification_targets_column()
+    _ensure_app_config_columns()
     Base.metadata.create_all(bind=engine)
     with SessionLocal() as session:
         ensure_auth_row(session)
@@ -111,7 +143,24 @@ def create_app() -> FastAPI:
 
     static_dir = Path(__file__).parent / "static"
     if static_dir.exists():
-        app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
+        index_path = static_dir / "index.html"
+
+        @app.get("/", include_in_schema=False)
+        async def spa_index():
+            if index_path.exists():
+                return FileResponse(index_path)
+            raise HTTPException(status_code=404)
+
+        @app.get("/{full_path:path}", include_in_schema=False)
+        async def spa_fallback(full_path: str):
+            if full_path.startswith("api/"):
+                raise HTTPException(status_code=404)
+            candidate = static_dir / full_path
+            if candidate.exists() and candidate.is_file():
+                return FileResponse(candidate)
+            if index_path.exists():
+                return FileResponse(index_path)
+            raise HTTPException(status_code=404)
     return app
 
 
