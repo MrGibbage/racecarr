@@ -49,6 +49,7 @@ from ..schemas.common import (
     ScheduledSearchCreate,
     ScheduledSearchOut,
     DemoSeedResponse,
+    ScheduledSearchUpdate,
 )
 from ..models.entities import Season, Round, Event, Indexer, Downloader, CachedSearch, ScheduledSearch
 from ..services.f1api import refresh_season
@@ -1130,6 +1131,30 @@ def create_scheduled_search(
     scheduler = _get_scheduler(request)
     item = scheduler.create_search(session, payload)
     log_response("scheduler_create", id=item.id, round_id=item.round_id, event_type=item.event_type)
+    return item
+
+
+@router.patch("/scheduler/searches/{search_id}", response_model=ScheduledSearchOut)
+def update_scheduled_search(
+    search_id: int,
+    payload: ScheduledSearchUpdate,
+    request: Request,
+    session: Session = Depends(get_session),
+    auth: AuthSession = Depends(require_auth),
+) -> ScheduledSearchOut:
+    scheduler = _get_scheduler(request)
+    try:
+        item = scheduler.update_search(
+            session,
+            search_id,
+            downloader_id=payload.downloader_id,
+            status=payload.status,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scheduled search not found")
+    log_response("scheduler_update", id=item.id, status=item.status)
     return item
 
 

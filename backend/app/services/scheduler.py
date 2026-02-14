@@ -19,6 +19,7 @@ STATUS_RUNNING = "running"
 STATUS_WAITING = "waiting-download"
 STATUS_COMPLETED = "completed"
 STATUS_FAILED = "failed"
+STATUS_PAUSED = "paused"
 
 
 class SchedulerService:
@@ -285,6 +286,32 @@ class SchedulerService:
             event_start_utc=event_start,
         )
         session.add(item)
+        session.commit()
+        session.refresh(item)
+        return item
+
+    def update_search(self, session: Session, search_id: int, *, downloader_id: int | None = None, status: str | None = None) -> ScheduledSearch | None:
+        item: ScheduledSearch | None = session.query(ScheduledSearch).filter_by(id=search_id).first()
+        if not item:
+            return None
+
+        now = datetime.utcnow()
+
+        if downloader_id is not None:
+            item.downloader_id = downloader_id
+
+        if status:
+            normalized = status.lower()
+            if normalized not in {STATUS_PENDING, STATUS_PAUSED}:
+                raise ValueError("Invalid status")
+            item.status = normalized
+            item.last_error = None
+            if normalized == STATUS_PAUSED:
+                item.next_run_at = None
+            else:
+                next_due = self._compute_next_run(item.event_start_utc, now)
+                item.next_run_at = next_due
+
         session.commit()
         session.refresh(item)
         return item
