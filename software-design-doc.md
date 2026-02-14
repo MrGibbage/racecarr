@@ -527,17 +527,13 @@ For each rule:
 - No custom integrations needed  
 
 ## 8.2 Events  
-- Download started  
-- Download completed  
-- Download failed  
-- New event available  
-- Rule triggered  
-- Indexer/downloader errors  
+- Implemented: download started/completed/failed (sent from scheduler poll + send_to_downloader) with per-target event filters.  
+- Planned: new event available, rule triggered/auto-download skipped, indexer/downloader errors, scheduler/search failures, storage low, auth/security alerts.  
 
 ## 8.3 UI  
 - Add/edit/remove endpoints  
 - Test endpoint  
-- Select which events trigger notifications  
+- Select which events trigger notifications per target; defaults to all events.  
 
 ---
 

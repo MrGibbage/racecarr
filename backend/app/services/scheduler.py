@@ -9,8 +9,9 @@ from sqlalchemy.orm import Session, selectinload
 from ..core.database import SessionLocal
 from ..models.entities import ScheduledSearch, Round, Downloader, Indexer, Season
 from ..schemas.common import ScheduledSearchCreate, SearchSettings
-from ..services.app_config import get_search_settings, DEFAULT_AUTO_DOWNLOAD_THRESHOLD
+from ..services.app_config import get_search_settings, DEFAULT_AUTO_DOWNLOAD_THRESHOLD, list_notification_targets
 from ..services.downloader_client import send_to_downloader, list_history
+from ..services.notifications import send_notifications
 from ..api.routes import _search_round_events, _apply_scoring
 
 
@@ -66,6 +67,43 @@ class SchedulerService:
             except Exception as exc:  # pragma: no cover - defensive
                 logger.exception("Scheduler poll failed", error=str(exc))
             await asyncio.sleep(self._poll_seconds)
+
+    def _notify_event(
+        self,
+        session: Session,
+        *,
+        event: str,
+        title: str,
+        downloader: Downloader | None = None,
+        reason: str | None = None,
+    ) -> None:
+        try:
+            targets = list_notification_targets(session)
+        except Exception as exc:
+            logger.warning("Notification targets unavailable", error_type=type(exc).__name__)
+            return
+
+        if not targets:
+            return
+
+        downloader_name = downloader.name if downloader else None
+        label = event.replace("-", " ").capitalize()
+        message = f"{label}: {title}"
+        if downloader_name:
+            message = f"{message} ({downloader_name})"
+        if reason:
+            message = f"{message} - {reason}"
+
+        try:
+            send_notifications(
+                targets,
+                message=message,
+                title="Racecarr",
+                event=event,
+                data={"title": title, "downloader": downloader_name, "reason": reason},
+            )
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("Notification dispatch failed", event=event, error_type=type(exc).__name__)
 
     async def run_due(self) -> None:
         now = datetime.utcnow()
@@ -127,10 +165,18 @@ class SchedulerService:
                     item.status = STATUS_COMPLETED
                     item.last_error = None
                     item.next_run_at = None
+                    self._notify_event(session, event="download-complete", title=item.nzb_title or tag, downloader=downloader)
                 elif status in {"failed", "failure", "error"}:
                     item.status = STATUS_FAILED
                     item.last_error = "Downloader reported failure"
                     item.next_run_at = self._compute_next_run(item.event_start_utc, now)
+                    self._notify_event(
+                        session,
+                        event="download-fail",
+                        title=item.nzb_title or tag,
+                        downloader=downloader,
+                        reason=item.last_error,
+                    )
 
             session.commit()
 
@@ -274,6 +320,7 @@ class SchedulerService:
             item.downloader_id = downloader.id
             item.last_error = None
             item.next_run_at = now + timedelta(hours=6)  # safety retry window while waiting
+            self._notify_event(session, event="download-start", title=best.title, downloader=downloader)
         else:
             item.status = STATUS_PENDING
             item.last_error = message

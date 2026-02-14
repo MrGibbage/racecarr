@@ -239,6 +239,8 @@ class NotificationTarget(BaseModel):
     type: str
     url: str
     name: str | None = None
+    events: list[str] = Field(default_factory=list)
+    events: list[str] = Field(default_factory=list)
 
 
 class NotificationTargetCreate(BaseModel):
@@ -246,6 +248,8 @@ class NotificationTargetCreate(BaseModel):
     url: str
     name: str | None = None
     secret: str | None = None
+    events: list[str] = Field(default_factory=list)
+    events: list[str] = Field(default_factory=list)
 
 
 class NotificationTargets(BaseModel):

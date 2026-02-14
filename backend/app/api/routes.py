@@ -127,6 +127,7 @@ def _scrub_targets(raw: list[dict]) -> list[dict]:
             "type": target.get("type"),
             "url": target.get("url"),
             "name": target.get("name"),
+            "events": target.get("events") or [],
         })
     return cleaned
 

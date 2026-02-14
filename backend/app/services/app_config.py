@@ -18,6 +18,7 @@ DEFAULT_MAX_RES = 2160
 DEFAULT_ALLOW_HDR = True
 DEFAULT_AUTO_DOWNLOAD_THRESHOLD = 50
 DEFAULT_EVENT_ALLOWLIST = ["race", "qualifying", "sprint", "sprint-qualifying", "fp1", "fp2", "fp3"]
+DEFAULT_NOTIFICATION_EVENTS = ["download-start", "download-complete", "download-fail"]
 
 
 def _parse_json(value: str | None) -> Any:
@@ -144,11 +145,63 @@ def list_notification_targets(session: Session) -> list[dict[str, Any]]:
     targets = _parse_json(row.notification_targets) or []
     if not isinstance(targets, list):
         targets = []
-    return targets
+    normalized: list[dict[str, Any]] = []
+    for target in targets:
+        if not isinstance(target, dict):
+            continue
+        events_raw = target.get("events")
+        events = _normalize_events(events_raw)
+        target = {
+            "type": target.get("type"),
+            "url": target.get("url"),
+            "name": target.get("name"),
+            "secret": target.get("secret"),
+            "events": events,
+        }
+        normalized.append(target)
+    return normalized
 
 
 def save_notification_targets(session: Session, targets: list[dict[str, Any]]) -> None:
     row = ensure_app_config(session)
-    row.notification_targets = _dump_json(targets)
+    cleaned: list[dict[str, Any]] = []
+    for target in targets:
+        if not isinstance(target, dict):
+            continue
+        events = _normalize_events(target.get("events"))
+        cleaned.append({
+            "type": target.get("type"),
+            "url": target.get("url"),
+            "name": target.get("name"),
+            "secret": target.get("secret"),
+            "events": events,
+        })
+    row.notification_targets = _dump_json(cleaned)
     session.commit()
     session.refresh(row)
+
+
+def _normalize_events(raw: Any) -> list[str]:
+    if not raw:
+        return list(DEFAULT_NOTIFICATION_EVENTS)
+    normalized = []
+    if isinstance(raw, (list, tuple, set)):
+        for val in raw:
+            if not val:
+                continue
+            text = str(val).strip().lower()
+            if text:
+                normalized.append(text)
+    else:
+        text = str(raw).strip().lower()
+        if text:
+            normalized.append(text)
+    # preserve order while deduping
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for val in normalized:
+        if val in seen:
+            continue
+        seen.add(val)
+        deduped.append(val)
+    return deduped or list(DEFAULT_NOTIFICATION_EVENTS)
