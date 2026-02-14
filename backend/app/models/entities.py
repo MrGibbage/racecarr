@@ -104,3 +104,7 @@ class ScheduledSearch(Base):
     downloader_id = Column(Integer, ForeignKey("downloader.id"), nullable=True)
     event_start_utc = Column(DateTime, nullable=True)
     attempts = Column(Integer, nullable=False, default=0)
+    min_resolution = Column(Integer, nullable=True)
+    max_resolution = Column(Integer, nullable=True)
+    allow_hdr = Column(Boolean, nullable=True)
+    auto_download_threshold = Column(Integer, nullable=True)

@@ -6,12 +6,15 @@ import {
   Card,
   Group,
   Loader,
+  Modal,
   ScrollArea,
   Select,
   Stack,
   Table,
   Text,
   Title,
+  NumberInput,
+  Checkbox,
 } from "@mantine/core";
 import { apiFetch } from "../api";
 
@@ -62,6 +65,10 @@ type ScheduledSearch = {
   nzb_url?: string | null;
   downloader_id?: number | null;
   attempts?: number;
+  min_resolution?: number | null;
+  max_resolution?: number | null;
+  allow_hdr?: boolean | null;
+  auto_download_threshold?: number | null;
 };
 
 type Downloader = {
@@ -168,6 +175,11 @@ export function Scheduler() {
   const [seedBusy, setSeedBusy] = useState(false);
   const [timeMode, setTimeMode] = useState<"local" | "utc">("local");
   const [clock, setClock] = useState<string>(() => formatNow("local"));
+  const [editItem, setEditItem] = useState<ScheduledSearch | null>(null);
+  const [editMinRes, setEditMinRes] = useState<number | null>(null);
+  const [editMaxRes, setEditMaxRes] = useState<number | null>(null);
+  const [editAllowHdr, setEditAllowHdr] = useState<boolean | null>(null);
+  const [editThreshold, setEditThreshold] = useState<number | null>(null);
 
   const roundLookup = useMemo(() => {
     const map = new Map<
@@ -406,6 +418,48 @@ export function Scheduler() {
     return `${settings.min_resolution}p-${settings.max_resolution}p • Score ≥ ${settings.auto_download_threshold} • ${hdr}`;
   };
 
+  const renderQualityFor = (item: ScheduledSearch) => {
+    if (!settings) return "—";
+    const min = item.min_resolution ?? settings.min_resolution;
+    const max = item.max_resolution ?? settings.max_resolution;
+    const hdr = (item.allow_hdr ?? settings.allow_hdr) ? "HDR ok" : "HDR off";
+    const threshold = item.auto_download_threshold ?? settings.auto_download_threshold;
+    return `${min}p-${max}p • Score ≥ ${threshold} • ${hdr}`;
+  };
+
+  const openEdit = (item: ScheduledSearch) => {
+    setEditItem(item);
+    setEditMinRes(item.min_resolution ?? settings?.min_resolution ?? null);
+    setEditMaxRes(item.max_resolution ?? settings?.max_resolution ?? null);
+    setEditAllowHdr(item.allow_hdr ?? settings?.allow_hdr ?? null);
+    setEditThreshold(item.auto_download_threshold ?? settings?.auto_download_threshold ?? null);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editItem) return;
+    const targetId = editItem.id;
+    setActionLoading((prev) => ({ ...prev, [targetId]: true }));
+    try {
+      const res = await apiFetch(`/scheduler/searches/${editItem.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          min_resolution: editMinRes,
+          max_resolution: editMaxRes,
+          allow_hdr: editAllowHdr,
+          auto_download_threshold: editThreshold,
+        }),
+      });
+      if (!res.ok) throw new Error(`Update failed (${res.status})`);
+      setEditItem(null);
+      await refreshScheduled();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Update failed");
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [targetId]: false }));
+    }
+  };
+
   return (
     <Stack gap="md">
       <Group justify="space-between" align="center">
@@ -596,7 +650,7 @@ export function Scheduler() {
                     </Table.Td>
                     <Table.Td>
                       <Text size="sm" c="dimmed">
-                        {renderQuality()}
+                        {renderQualityFor(item)}
                       </Text>
                     </Table.Td>
                     <Table.Td>
@@ -608,6 +662,14 @@ export function Scheduler() {
                           disabled={busy || actionLoading[item.id]}
                         >
                           Search now
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="default"
+                          onClick={() => openEdit(item)}
+                          disabled={actionLoading[item.id]}
+                        >
+                          Edit
                         </Button>
                         <Button
                           size="xs"
@@ -651,6 +713,99 @@ export function Scheduler() {
           </Table>
         </ScrollArea>
       )}
+      <EditModal
+        opened={!!editItem}
+        onClose={() => setEditItem(null)}
+        onSave={handleSaveEdit}
+        minRes={editMinRes}
+        setMinRes={setEditMinRes}
+        maxRes={editMaxRes}
+        setMaxRes={setEditMaxRes}
+        allowHdr={editAllowHdr}
+        setAllowHdr={setEditAllowHdr}
+        threshold={editThreshold}
+        setThreshold={setEditThreshold}
+        busy={editItem ? !!actionLoading[editItem.id] : false}
+      />
     </Stack>
+  );
+}
+
+function EditModal({
+  opened,
+  onClose,
+  onSave,
+  minRes,
+  setMinRes,
+  maxRes,
+  setMaxRes,
+  allowHdr,
+  setAllowHdr,
+  threshold,
+  setThreshold,
+  busy,
+}: {
+  opened: boolean;
+  onClose: () => void;
+  onSave: () => void;
+  minRes: number | null;
+  setMinRes: (v: number | null) => void;
+  maxRes: number | null;
+  setMaxRes: (v: number | null) => void;
+  allowHdr: boolean | null;
+  setAllowHdr: (v: boolean | null) => void;
+  threshold: number | null;
+  setThreshold: (v: number | null) => void;
+  busy: boolean;
+}) {
+  return (
+    <Modal opened={opened} onClose={onClose} title="Edit watch settings" centered>
+      <Stack gap="sm">
+        <Group grow>
+          <NumberInput
+            label="Min resolution"
+            placeholder="Default"
+            value={minRes}
+            onChange={(val) => setMinRes(typeof val === "number" ? val : null)}
+            min={240}
+            max={4320}
+          />
+          <NumberInput
+            label="Max resolution"
+            placeholder="Default"
+            value={maxRes}
+            onChange={(val) => setMaxRes(typeof val === "number" ? val : null)}
+            min={240}
+            max={4320}
+          />
+        </Group>
+        <Group justify="space-between" align="center">
+          <Checkbox
+            label="Allow HDR"
+            checked={allowHdr ?? false}
+            onChange={(e) => setAllowHdr(e.currentTarget.checked)}
+          />
+          <Button variant="subtle" size="xs" onClick={() => setAllowHdr(null)}>
+            Use default
+          </Button>
+        </Group>
+        <NumberInput
+          label="Auto-download score threshold"
+          placeholder="Default"
+          value={threshold}
+          onChange={(val) => setThreshold(typeof val === "number" ? val : null)}
+          min={0}
+          max={100}
+        />
+        <Group justify="flex-end" gap="sm">
+          <Button variant="default" onClick={onClose} disabled={busy}>
+            Cancel
+          </Button>
+          <Button onClick={onSave} loading={busy}>
+            Save
+          </Button>
+        </Group>
+      </Stack>
+    </Modal>
   );
 }

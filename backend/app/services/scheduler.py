@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from ..core.database import SessionLocal
 from ..models.entities import ScheduledSearch, Round, Downloader, Indexer
-from ..schemas.common import ScheduledSearchCreate
+from ..schemas.common import ScheduledSearchCreate, SearchSettings
 from ..services.app_config import get_search_settings, DEFAULT_AUTO_DOWNLOAD_THRESHOLD
 from ..services.downloader_client import send_to_downloader, list_history
 from ..api.routes import _search_round_events, _apply_scoring
@@ -211,8 +211,18 @@ class SchedulerService:
             item.next_run_at = next_due
             return
 
-        _apply_scoring(results, cfg)
-        threshold = cfg.auto_download_threshold or DEFAULT_AUTO_DOWNLOAD_THRESHOLD
+        effective = SearchSettings(**cfg.model_dump())
+        if item.min_resolution is not None:
+            effective.min_resolution = item.min_resolution
+        if item.max_resolution is not None:
+            effective.max_resolution = item.max_resolution
+        if item.allow_hdr is not None:
+            effective.allow_hdr = item.allow_hdr
+        if item.auto_download_threshold is not None:
+            effective.auto_download_threshold = item.auto_download_threshold
+
+        _apply_scoring(results, effective)
+        threshold = effective.auto_download_threshold or DEFAULT_AUTO_DOWNLOAD_THRESHOLD
         best = self._pick_best(results, threshold)
         if not best or not best.nzb_url:
             item.status = STATUS_PENDING
@@ -290,7 +300,18 @@ class SchedulerService:
         session.refresh(item)
         return item
 
-    def update_search(self, session: Session, search_id: int, *, downloader_id: int | None = None, status: str | None = None) -> ScheduledSearch | None:
+    def update_search(
+        self,
+        session: Session,
+        search_id: int,
+        *,
+        downloader_id: int | None = None,
+        status: str | None = None,
+        min_resolution: int | None = None,
+        max_resolution: int | None = None,
+        allow_hdr: bool | None = None,
+        auto_download_threshold: int | None = None,
+    ) -> ScheduledSearch | None:
         item: ScheduledSearch | None = session.query(ScheduledSearch).filter_by(id=search_id).first()
         if not item:
             return None
@@ -299,6 +320,15 @@ class SchedulerService:
 
         if downloader_id is not None:
             item.downloader_id = downloader_id
+
+        if min_resolution is not None:
+            item.min_resolution = min_resolution
+        if max_resolution is not None:
+            item.max_resolution = max_resolution
+        if allow_hdr is not None:
+            item.allow_hdr = allow_hdr
+        if auto_download_threshold is not None:
+            item.auto_download_threshold = auto_download_threshold
 
         if status:
             normalized = status.lower()
