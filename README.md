@@ -15,19 +15,26 @@ uv sync --python "C:\Python312\python.exe"
 uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 # frontend (separate terminal)
-cd frontend
-npm install
-npm run dev
-# (add --host if you need LAN access; --port 5173 if you want to pin the port)
-```
+Frontend
+Vite + React + Mantine. Pages: Dashboard, Manual Search, Scheduler, Settings, Logs. Proxy to backend on `/api` during `npm run dev`.
 
-Backend listens on 8000 in dev. Frontend dev server runs on 5173; API base resolves to `VITE_API_URL` when set, otherwise falls back to `http://localhost:8000/api`.
+Dashboard:
+- Add or refresh a season by year; hide seasons from view and the hidden list persists across reloads/restarts.
+- Expand/collapse seasons and rounds; expansion state persists in localStorage.
+- Run “Search all events” for a round; cached 24h, with Reload to bypass.
 
-### Dev/demo toggles
-- `ALLOW_DEMO_SEED=true` (backend env) exposes `/api/demo/seed-scheduler` to insert a demo season/round with nearby events and sample scheduled searches.
-- `VITE_ALLOW_DEMO_SEED=true` (frontend env) shows a "Create demo events" button on the Scheduler page that calls the endpoint above.
-Restart backend/frontend after changing these flags.
+Manual Search:
+- Enter a title with optional limit, allowlist toggle, and raw/bypass allowlist toggle; shows event labels when available.
 
+Scheduler page:
+- Lists scheduled searches with status badges, periodicity, downloader selection, and actions (run now/delete) with busy-state disabling.
+- Polls every 15s for live updates.
+- Quick-add lets you enqueue all future events of a type for a season; respects duplicates.
+- Demo button (when `VITE_ALLOW_DEMO_SEED=true`) seeds a fake season and scheduled searches via `/api/demo/seed-scheduler`.
+
+Search & auto-download
+- Event filter buttons show the big seven plus Other; All shows everything for the round.
+- “Auto download best” respects the current filter: All sends the top-scoring item per event, a specific event sends only that event, and Other disables the button. Threshold/default downloader come from Settings → Search & Quality.
 ## Authentication
 - Single-user password; default is seeded to `admin` on first start. Update it in Settings → Security.
 - Session cookie `rc_session` is httpOnly with remember-me and idle timeout refresh; login at `/login`.

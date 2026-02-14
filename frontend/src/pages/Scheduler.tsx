@@ -98,12 +98,23 @@ const normalizeEventType = (value?: string | null) => {
   return normalized.replace(/\s+/g, "-");
 };
 
-const formatDateTime = (value?: string | null) => {
+const formatDateTime = (value?: string | null, mode: "local" | "utc" = "local") => {
   if (!value) return "—";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString();
+  const formatter = new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    timeZone: mode === "utc" ? "UTC" : undefined,
+  });
+  return formatter.format(d);
 };
+
+const formatNow = (mode: "local" | "utc") => formatDateTime(new Date().toISOString(), mode);
 
 const computePeriodicity = (eventStart?: Date | null, nextRun?: Date | null) => {
   if (!eventStart) {
@@ -153,6 +164,8 @@ export function Scheduler() {
   const [quickBusy, setQuickBusy] = useState(false);
   const [seedMessage, setSeedMessage] = useState<string | null>(null);
   const [seedBusy, setSeedBusy] = useState(false);
+  const [timeMode, setTimeMode] = useState<"local" | "utc">("local");
+  const [clock, setClock] = useState<string>(() => formatNow("local"));
 
   const roundLookup = useMemo(() => {
     const map = new Map<
@@ -236,6 +249,14 @@ export function Scheduler() {
   useEffect(() => {
     fetchAll();
   }, []);
+
+  useEffect(() => {
+    setClock(formatNow(timeMode));
+    const id = window.setInterval(() => {
+      setClock(formatNow(timeMode));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [timeMode]);
 
   const refreshScheduled = useCallback(async () => {
     try {
@@ -383,6 +404,31 @@ export function Scheduler() {
         </Group>
       </Group>
 
+      <Group justify="space-between" align="center">
+        <Group gap="xs">
+          <Button
+            variant={timeMode === "local" ? "filled" : "default"}
+            onClick={() => setTimeMode("local")}
+            size="xs"
+          >
+            Local
+          </Button>
+          <Button
+            variant={timeMode === "utc" ? "filled" : "default"}
+            onClick={() => setTimeMode("utc")}
+            size="xs"
+          >
+            UTC
+          </Button>
+          <Button variant="default" size="xs" disabled title="Track-local timezone not available yet">
+            Track (coming soon)
+          </Button>
+        </Group>
+        <Text size="sm" c="dimmed">
+          Live clock: {clock}
+        </Text>
+      </Group>
+
       {error && (
         <Alert color="red" title="Error" variant="light">
           {error}
@@ -479,6 +525,7 @@ export function Scheduler() {
                 <Table.Th>Event</Table.Th>
                 <Table.Th>Added</Table.Th>
                 <Table.Th>Last searched</Table.Th>
+                <Table.Th>Event start</Table.Th>
                 <Table.Th>Next run</Table.Th>
                 <Table.Th>Periodicity</Table.Th>
                 <Table.Th>Status</Table.Th>
@@ -508,9 +555,10 @@ export function Scheduler() {
                         {item.event_type}
                       </Badge>
                     </Table.Td>
-                    <Table.Td>{formatDateTime(item.added_at)}</Table.Td>
-                    <Table.Td>{formatDateTime(item.last_searched_at)}</Table.Td>
-                    <Table.Td>{formatDateTime(item.next_run_at)}</Table.Td>
+                    <Table.Td>{formatDateTime(item.added_at, timeMode)}</Table.Td>
+                    <Table.Td>{formatDateTime(item.last_searched_at, timeMode)}</Table.Td>
+                    <Table.Td>{formatDateTime(eventStartIso, timeMode)}</Table.Td>
+                    <Table.Td>{formatDateTime(item.next_run_at, timeMode)}</Table.Td>
                     <Table.Td>{computePeriodicity(eventStart, nextRun)}</Table.Td>
                     <Table.Td>
                       <Badge color={statusColor(item.status)} variant="filled">
@@ -530,7 +578,6 @@ export function Scheduler() {
                         onChange={(val) => handleUpdateDownloader(item, val ? Number(val) : null)}
                         size="xs"
                         clearable
-                        withinPortal
                         disabled={actionLoading[item.id]}
                       />
                     </Table.Td>
@@ -566,7 +613,7 @@ export function Scheduler() {
               })}
               {!scheduled.length && (
                 <Table.Tr>
-                  <Table.Td colSpan={11}>
+                  <Table.Td colSpan={12}>
                     <Text c="dimmed" size="sm">
                       No scheduled searches yet. Use quick add or the Dashboard to add watchlist entries.
                     </Text>

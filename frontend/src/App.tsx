@@ -14,7 +14,7 @@ import { apiFetch } from "./api";
 
 const navItems = [
   { label: "Dashboard", to: "/", icon: IconHome },
-  { label: "Search", to: "/search", icon: IconSearch },
+  { label: "Manual Search", to: "/search", icon: IconSearch },
   { label: "Scheduler", to: "/scheduler", icon: IconClockHour4 },
   { label: "Settings", to: "/settings", icon: IconSettings },
   { label: "Logs", to: "/logs", icon: IconListDetails }

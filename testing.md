@@ -25,8 +25,8 @@
 - [x] POST http://localhost:8000/api/indexers/{id}/test → connectivity check (caps)
 
 ### Frontend (local dev)
-- [x] Dashboard: shows 3 season cards; “Seed demo seasons” works; “Refresh” reloads list
-- [x] Search: shows 3 demo results table; “Refresh demo results” reloads
+- [x] Dashboard: add/refresh season by year; hide/unhide seasons persists; expand/collapse seasons and rounds persists; “Refresh list” reloads
+- [x] Manual Search: shows results table with event labels; limit + allowlist toggle + raw toggle; Enter submits
 - [x] Logs: shows last log entries table (timestamp/level/message)
 > Note: frontend calls `VITE_API_URL` if provided, otherwise `http://localhost:8000/api`.
 
@@ -56,12 +56,12 @@
 ### Downloaders
 - [X] Add SABnzbd/NZBGet downloader and test connection
 - [X] “Send to downloader” from a search result creates a job in downloader
-- [ ] Status polling shows queue/completed/failed items (save for a later build)
+- [ ] Status polling shows queue/completed/failed items (deferred to a later build)
 
 ### Scheduler / Refresh
-- [ ] Scheduler tick runs on interval, refreshes current season from f1api.dev
-- [ ] Manual “refresh season” triggers f1api fetch and updates rounds/events
-- [ ] Auto-download rules run on schedule and create downloads when score threshold met
+- [x] Scheduler tick runs on interval, refreshes current season from f1api.dev
+- [x] Manual “refresh season” triggers f1api fetch and updates rounds/events
+- [x] Auto-download rules run on schedule and create downloads when score threshold met
 
 ### Watchlists / Rules
 - [ ] Create/edit/disable a watch rule (season/round/event types, quality profile, downloader selection)
