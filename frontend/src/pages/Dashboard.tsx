@@ -168,13 +168,6 @@ export function Dashboard() {
   const [watchlistMap, setWatchlistMap] = useState<Record<string, ScheduledSearch>>({});
   const [addingWatch, setAddingWatch] = useState<Record<string, boolean>>({});
 
-  const logDebug = (msg: string, extra?: Record<string, unknown>) => {
-    // Keep logging lightweight; disable in production builds via browser filters if noisy.
-    const payload = extra ? { ...extra } : undefined;
-    // eslint-disable-next-line no-console
-    console.debug(`[dashboard] ${msg}`, payload);
-  };
-
   const resolvedAllowlist = useMemo(
     () =>
       new Set(
@@ -221,12 +214,6 @@ export function Dashboard() {
       if (parsedSeasons) setExpandedSeasons(parsedSeasons);
       if (parsedRounds) setExpandedRounds(parsedRounds);
       if (parsedHidden) setHiddenSeasons(parsedHidden);
-
-      logDebug("hydrated storage", {
-        expandedSeasons: parsedSeasons,
-        expandedRounds: parsedRounds,
-        hiddenSeasons: parsedHidden ? Array.from(parsedHidden) : [],
-      });
     } catch {
       // ignore corrupt storage
     }
@@ -236,19 +223,16 @@ export function Dashboard() {
   useEffect(() => {
     if (!storageHydrated) return;
     localStorage.setItem(STORAGE_KEYS.expandedSeasons, JSON.stringify(expandedSeasons));
-    logDebug("persisted expanded seasons", { expandedSeasons });
   }, [expandedSeasons, storageHydrated]);
 
   useEffect(() => {
     if (!storageHydrated) return;
     localStorage.setItem(STORAGE_KEYS.expandedRounds, JSON.stringify(expandedRounds));
-    logDebug("persisted expanded rounds", { expandedRounds });
   }, [expandedRounds, storageHydrated]);
 
   useEffect(() => {
     if (!storageHydrated) return;
     localStorage.setItem(STORAGE_KEYS.hiddenSeasons, JSON.stringify(Array.from(hiddenSeasons)));
-    logDebug("persisted hidden seasons", { hiddenSeasons: Array.from(hiddenSeasons) });
   }, [hiddenSeasons, storageHydrated]);
 
   const fetchSeasons = async () => {
@@ -259,12 +243,6 @@ export function Dashboard() {
       if (!res.ok) throw new Error(`Failed to load seasons (${res.status})`);
       const data = (await res.json()) as Season[];
       const visible = data.filter((s) => !hiddenSeasons.has(toId(s.year)));
-      logDebug("fetched seasons", {
-        total: data.length,
-        hiddenCount: hiddenSeasons.size,
-        visible: visible.map((s) => s.year),
-        hidden: Array.from(hiddenSeasons),
-      });
       setSeasons(visible);
       ensureStateForSeasons(visible);
     } catch (err) {
@@ -283,21 +261,12 @@ export function Dashboard() {
       const refreshed = (await res.json()) as Season;
       const nextHidden = new Set(hiddenSeasons);
       if (nextHidden.delete(toId(refreshed.year))) {
-        logDebug("unhiding refreshed season", {
-          year: refreshed.year,
-          hiddenBefore: Array.from(hiddenSeasons),
-        });
         setHiddenSeasons(nextHidden);
       }
       setSeasons((prev) => {
         const others = prev.filter((s) => s.year !== year);
         const merged = [refreshed, ...others].sort((a, b) => b.year - a.year);
         const visible = merged.filter((s) => !nextHidden.has(toId(s.year)));
-        logDebug("refresh merged", {
-          refreshed: refreshed.year,
-          hidden: Array.from(nextHidden),
-          visible: visible.map((s) => s.year),
-        });
         ensureStateForSeasons(visible);
         // Reset round expansion for this season so it reopens with rounds collapsed
         setExpandedRounds((rounds) => ({ ...rounds, [refreshed.id]: {} }));
@@ -343,7 +312,6 @@ export function Dashboard() {
 
   const toggleSeason = (season: Season) => {
     const nextExpanded = !isSeasonExpanded(season.id);
-    logDebug("toggle season", { season: season.year, nextExpanded });
     setExpandedSeasons((prev) => ({ ...prev, [season.id]: nextExpanded }));
     if (nextExpanded) {
       // When expanding a season, reset all rounds to collapsed
@@ -357,7 +325,6 @@ export function Dashboard() {
     expandedRounds[seasonId]?.[roundNumber] ?? false;
 
   const toggleRound = (seasonId: number, roundNumber: number) => {
-    logDebug("toggle round", { seasonId, roundNumber });
     setExpandedRounds((prev) => {
       const seasonRounds = prev[seasonId] ? { ...prev[seasonId] } : {};
       seasonRounds[roundNumber] = !seasonRounds[roundNumber];
@@ -370,13 +337,11 @@ export function Dashboard() {
     season.rounds.forEach((r) => {
       next[r.round_number] = expanded;
     });
-    logDebug("set all rounds", { season: season.year, expanded });
     setExpandedRounds((prev) => ({ ...prev, [season.id]: next }));
   };
 
   const hideSeason = (season: Season) => {
     const year = toId(season.year);
-    logDebug("hide season", { year });
     setHiddenSeasons((prev) => new Set([...Array.from(prev), year]));
     setSeasons((prev) => prev.filter((s) => toId(s.year) !== year));
   };
@@ -538,7 +503,6 @@ export function Dashboard() {
   }, [storageHydrated]);
 
   useEffect(() => {
-    logDebug("hidden changed, filtering seasons", { hidden: Array.from(hiddenSeasons) });
     setSeasons((prev) => prev.filter((s) => !hiddenSeasons.has(toId(s.year))));
   }, [hiddenSeasons]);
 
