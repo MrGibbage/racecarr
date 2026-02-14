@@ -12,6 +12,12 @@ from ..schemas.common import ScheduledSearchCreate, SearchSettings
 from ..services.app_config import get_search_settings, DEFAULT_AUTO_DOWNLOAD_THRESHOLD, list_notification_targets
 from ..services.downloader_client import send_to_downloader, list_history
 from ..services.notifications import send_notifications
+from ..services.manual_downloads import (
+    list_manual_pending,
+    update_manual_status,
+    STATUS_COMPLETED as MANUAL_COMPLETED,
+    STATUS_FAILED as MANUAL_FAILED,
+)
 from ..api.routes import _search_round_events, _apply_scoring
 
 
@@ -132,9 +138,6 @@ class SchedulerService:
                 .filter(ScheduledSearch.status == STATUS_WAITING)
                 .all()
             )
-            if not waiting_items:
-                return
-
             downloader_cache: dict[int, Downloader | None] = {}
             for item in waiting_items:
                 downloader_id = item.downloader_id
@@ -176,6 +179,43 @@ class SchedulerService:
                         title=item.nzb_title or tag,
                         downloader=downloader,
                         reason=item.last_error,
+                    )
+
+            # Handle manual sends tagged with rc-manual-*
+            manual_pending = list_manual_pending(session)
+            for pending in manual_pending:
+                downloader_id = pending.get("downloader_id")
+                tag = str(pending.get("tag") or "").lower()
+                title = pending.get("title") or tag
+                if not downloader_id:
+                    update_manual_status(session, tag=tag, status=MANUAL_FAILED, last_error="Missing downloader")
+                    continue
+
+                downloader = downloader_cache.get(downloader_id)
+                if downloader is None:
+                    downloader = session.query(Downloader).filter_by(id=downloader_id, enabled=True).first()
+                    downloader_cache[downloader_id] = downloader
+                if not downloader:
+                    update_manual_status(session, tag=tag, status=MANUAL_FAILED, last_error="Downloader not available")
+                    continue
+
+                history = list_history(downloader, limit=80)
+                match = next((row for row in history if tag in (row.get("name") or "").lower()), None)
+                if not match:
+                    continue
+
+                status = (match.get("status") or "").lower()
+                if status in {"completed", "success", "ok"}:
+                    update_manual_status(session, tag=tag, status=MANUAL_COMPLETED, last_error=None)
+                    self._notify_event(session, event="download-complete", title=title, downloader=downloader)
+                elif status in {"failed", "failure", "error"}:
+                    update_manual_status(session, tag=tag, status=MANUAL_FAILED, last_error="Downloader reported failure")
+                    self._notify_event(
+                        session,
+                        event="download-fail",
+                        title=title,
+                        downloader=downloader,
+                        reason="Downloader reported failure",
                     )
 
             session.commit()

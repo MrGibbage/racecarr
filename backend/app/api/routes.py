@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from time import perf_counter
 from typing import Iterable
+from uuid import uuid4
 from loguru import logger
 from sqlalchemy.orm import selectinload
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Query
@@ -82,6 +83,7 @@ from ..services.app_config import (
     save_notification_targets,
 )
 from ..services.notifications import send_notifications
+from ..services.manual_downloads import record_manual_download
 
 router = APIRouter()
 
@@ -1556,16 +1558,19 @@ def send_to_downloader_route(
     item: Downloader | None = session.query(Downloader).filter_by(id=downloader_id).first()
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Downloader not found")
+    tag = f"rc-manual-{uuid4()}"
+    title_with_tag = f"{payload.title} [{tag}]"
     ok, message = send_to_downloader(
         item,
         nzb_url=payload.nzb_url,
-        title=payload.title,
+        title=title_with_tag,
         category=payload.category or item.category,
         priority=payload.priority if payload.priority is not None else item.priority,
     )
     log_response("send_to_downloader", id=downloader_id, ok=ok)
     if ok:
         try:
+            record_manual_download(session, tag=tag, title=payload.title, downloader_id=downloader_id)
             targets = list_notification_targets(session)
             if targets:
                 send_notifications(
