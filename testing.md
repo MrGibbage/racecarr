@@ -67,12 +67,12 @@
 - [x] Auto-download rules run on schedule and create downloads when score threshold met
 
 ### Watchlists / Rules
-- [ ] Create/edit/disable a watch rule (season/round/event types, quality profile, downloader selection)
-- [ ] Rule respects quality profile and category/priority when sending to downloader
+- [x] Create/edit/disable a watch entry (season-level add already supported; edit quality/score/downloader)
+- [x] Rule respects quality profile and category/priority when sending to downloader
 
 ### Quality Profiles
-- [ ] Define default quality profile (min/max resolution, codec, HDR/HLG allowed)
-- [ ] Per-search override uses the selected profile for scoring/selection
+- [x] Define default quality profile (min/max resolution, codec, HDR/HLG allowed)
+- [x] Per-search override uses the selected profile for scoring/selection
 
 ### Paths & Storage
 - [ ] Configure media root/temp paths; free-space display works; warn on low space (non-blocking)
