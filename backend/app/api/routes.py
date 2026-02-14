@@ -1247,14 +1247,29 @@ def auto_grab_round(
         if not item.nzb_url:
             skipped.append(f"Missing NZB for {label}: {item.title}")
             continue
+        tag = f"rc-autograb-{uuid4()}"
+        title_with_tag = f"{item.title} [{tag}]"
         ok, message = send_to_downloader(
             downloader,
             nzb_url=item.nzb_url,
-            title=item.title,
+            title=title_with_tag,
             category=downloader.category,
             priority=downloader.priority,
         )
         if ok:
+            try:
+                record_manual_download(session, tag=tag, title=item.title, downloader_id=downloader.id)
+                targets = list_notification_targets(session)
+                if targets:
+                    send_notifications(
+                        targets,
+                        message=f"Download started: {item.title} ({downloader.name})",
+                        title="Racecarr",
+                        event="download-start",
+                        data={"title": item.title, "downloader": downloader.name, "event": label},
+                    )
+            except Exception:
+                pass
             sent.append(
                 AutoGrabSelection(
                     title=item.title,
