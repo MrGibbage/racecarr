@@ -239,6 +239,11 @@ class ScheduledSearchCreate(BaseModel):
     downloader_id: int | None = None
 
 
+class ScheduledSearchUpdate(BaseModel):
+    downloader_id: int | None = None
+    status: str | None = None
+
+
 class ScheduledSearchOut(BaseModel):
     id: int
     round_id: int

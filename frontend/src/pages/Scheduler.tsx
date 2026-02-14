@@ -140,12 +140,14 @@ const statusColor = (status: string) => {
   if (key === "waiting-download") return "grape";
   if (key === "completed") return "teal";
   if (key === "failed") return "red";
+  if (key === "paused") return "gray";
   return "gray";
 };
 
 const statusLabel = (status: string) => {
   const key = status.toLowerCase();
   if (key === "waiting-download") return "Waiting";
+  if (key === "paused") return "Paused";
   return status.charAt(0).toUpperCase() + status.slice(1);
 };
 
@@ -307,17 +309,28 @@ export function Scheduler() {
     if (item.downloader_id === downloaderId) return;
     setActionLoading((prev) => ({ ...prev, [item.id]: true }));
     try {
-      // No update endpoint exists, so recreate the entry with the new downloader.
-      const delRes = await apiFetch(`/scheduler/searches/${item.id}`, { method: "DELETE" });
-      if (!delRes.ok && delRes.status !== 204) throw new Error(`Update failed (${delRes.status})`);
-      const res = await apiFetch(`/scheduler/searches`, {
-        method: "POST",
+      const res = await apiFetch(`/scheduler/searches/${item.id}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          round_id: item.round_id,
-          event_type: item.event_type,
-          downloader_id: downloaderId ?? undefined,
-        }),
+        body: JSON.stringify({ downloader_id: downloaderId }),
+      });
+      if (!res.ok) throw new Error(`Update failed (${res.status})`);
+      await refreshScheduled();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Update failed");
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [item.id]: false }));
+    }
+  };
+
+  const handleUpdateStatus = async (item: ScheduledSearch, status: "paused" | "pending") => {
+    if (item.status.toLowerCase() === status) return;
+    setActionLoading((prev) => ({ ...prev, [item.id]: true }));
+    try {
+      const res = await apiFetch(`/scheduler/searches/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
       });
       if (!res.ok) throw new Error(`Update failed (${res.status})`);
       await refreshScheduled();
@@ -595,6 +608,20 @@ export function Scheduler() {
                           disabled={busy || actionLoading[item.id]}
                         >
                           Search now
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="subtle"
+                          onClick={() =>
+                            handleUpdateStatus(
+                              item,
+                              item.status.toLowerCase() === "paused" ? "pending" : "paused"
+                            )
+                          }
+                          loading={actionLoading[item.id]}
+                          disabled={actionLoading[item.id]}
+                        >
+                          {item.status.toLowerCase() === "paused" ? "Resume" : "Pause"}
                         </Button>
                         <Button
                           size="xs"
