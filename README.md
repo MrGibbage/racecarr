@@ -19,7 +19,9 @@ Frontend
 Vite + React + Mantine. Pages: Dashboard, Manual Search, Scheduler, Settings, Logs. Proxy to backend on `/api` during `npm run dev`.
 
 Dashboard:
-- Add or refresh a season by year; hide seasons from view and the hidden list persists across reloads/restarts.
+- Add or refresh a season by year.
+- Hide seasons (soft delete) to remove them from the dashboard, dropdowns, and scheduler; restore hidden seasons from the Hidden panel.
+- Hard delete a season (and its rounds/events/watchlist entries) from the Hidden panel.
 - Expand/collapse seasons and rounds; expansion state persists in localStorage.
 - Run “Search all events” for a round; cached 24h, with Reload to bypass.
 
@@ -32,6 +34,7 @@ Scheduler page:
 - Quick-add lets you enqueue all future events of a type for a season; respects duplicates.
 - Demo button (when `VITE_ALLOW_DEMO_SEED=true`) seeds a fake season and scheduled searches via `/api/demo/seed-scheduler`.
 - Each watch entry supports pause/resume and per-entry overrides for downloader, resolution range, HDR allowance, and score threshold.
+ - Hidden seasons’ watch entries are paused and excluded from listings; restoring the season resumes scheduling.
 
 Search & auto-download
 - Event filter buttons show the big seven plus Other; All shows everything for the round.
@@ -51,8 +54,11 @@ Search & auto-download
 - `GET/POST /api/settings/log-level`
 - `GET /api/settings/about`
 - `GET /api/seasons`
- - `POST/GET /api/demo-seasons`
+- `POST/GET /api/demo-seasons`
 - `POST /api/seasons/{year}/refresh`
+- `POST /api/seasons/{year}/hide` (soft delete)
+- `POST /api/seasons/{year}/restore`
+- `DELETE /api/seasons/{year}` (hard delete; removes rounds/events/watchlist/cached searches)
  - `GET /api/search-demo`
  - `POST /api/demo/seed-scheduler`
  - `GET /api/logs`
@@ -60,6 +66,7 @@ Search & auto-download
  - `PUT/DELETE /api/indexers/{id}`
  - `POST /api/indexers/{id}/test`
  - `GET/POST /api/scheduler/searches`
+	- `PATCH /api/scheduler/searches/{id}` (downloader/status/quality overrides)
  - `DELETE /api/scheduler/searches/{id}`
  - `POST /api/scheduler/searches/{id}/run`
 

@@ -43,10 +43,22 @@ def _ensure_scheduled_search_overrides() -> None:
             conn.execute(text(stmt))
 
 
+def _ensure_season_soft_delete() -> None:
+    inspector = inspect(engine)
+    if "season" not in inspector.get_table_names():
+        return
+    cols = {col["name"] for col in inspector.get_columns("season")}
+    if "is_deleted" in cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE season ADD COLUMN is_deleted BOOLEAN DEFAULT 0"))
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     _ensure_downloader_priority_column()
     _ensure_scheduled_search_overrides()
+    _ensure_season_soft_delete()
     Base.metadata.create_all(bind=engine)
     with SessionLocal() as session:
         ensure_auth_row(session)

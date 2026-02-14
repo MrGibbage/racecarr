@@ -28,11 +28,16 @@ const EVENT_OPTIONS = [
 ];
 
 const RES_OPTIONS = [
-  { value: "720", label: "720p" },
-  { value: "1080", label: "1080i" },
-  { value: "1080", label: "1080p" },
-  { value: "2160", label: "4K" },
+  { value: "720", label: "720", numeric: 720 },
+  { value: "1080", label: "1080", numeric: 1080 },
+  { value: "2160", label: "4K", numeric: 2160 },
 ];
+
+const toResValue = (n: number | null) => {
+  if (n == null) return null;
+  const match = RES_OPTIONS.find((o) => o.numeric === n);
+  return match ? match.value : String(n);
+};
 
 type Event = {
   id?: number;
@@ -443,6 +448,10 @@ export function Scheduler() {
 
   const handleSaveEdit = async () => {
     if (!editItem) return;
+    if (editMinRes !== null && editMaxRes !== null && editMinRes > editMaxRes) {
+      setError("Min resolution cannot exceed max resolution.");
+      return;
+    }
     const targetId = editItem.id;
     setActionLoading((prev) => ({ ...prev, [targetId]: true }));
     try {
@@ -772,16 +781,22 @@ function EditModal({
             label="Min resolution"
             placeholder="Default"
             data={RES_OPTIONS}
-            value={minRes ? String(minRes) : null}
-            onChange={(val) => setMinRes(val ? Number(val) : null)}
+            value={toResValue(minRes)}
+            onChange={(val) => {
+              const opt = RES_OPTIONS.find((o) => o.value === val);
+              setMinRes(val ? opt?.numeric ?? Number(val) : null);
+            }}
             clearable
           />
           <Select
             label="Max resolution"
             placeholder="Default"
             data={RES_OPTIONS}
-            value={maxRes ? String(maxRes) : null}
-            onChange={(val) => setMaxRes(val ? Number(val) : null)}
+            value={toResValue(maxRes)}
+            onChange={(val) => {
+              const opt = RES_OPTIONS.find((o) => o.value === val);
+              setMaxRes(val ? opt?.numeric ?? Number(val) : null);
+            }}
             clearable
           />
         </Group>
