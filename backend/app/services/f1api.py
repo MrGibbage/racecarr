@@ -76,6 +76,9 @@ def refresh_season(session: Session, year: int) -> Season:
         session.add(season)
         session.flush()
 
+    # Refreshing should unhide the season if it was previously hidden.
+    season.is_deleted = False
+
     # Clear existing rounds/events for this season
     season.rounds.clear()
     session.flush()

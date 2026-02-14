@@ -37,6 +37,7 @@ type Season = {
   id: number;
   year: number;
   last_refreshed: string | null;
+  is_deleted?: boolean;
   rounds: Round[];
 };
 
@@ -124,7 +125,6 @@ const localFormatter = new Intl.DateTimeFormat(undefined, {
 const STORAGE_KEYS = {
   expandedSeasons: "rc_dashboard_expanded_seasons",
   expandedRounds: "rc_dashboard_expanded_rounds",
-  hiddenSeasons: "rc_dashboard_hidden_seasons",
 };
 
 const toId = (value: number | string | undefined | null) => Number(value ?? 0);
@@ -145,12 +145,11 @@ export function Dashboard() {
   const [expandedRounds, setExpandedRounds] = useState<Record<number, Record<number, boolean>>>(
     {}
   );
-  // Track hidden seasons by year (not DB id) so hiding survives backend restarts/resyncs.
-  const [hiddenSeasons, setHiddenSeasons] = useState<Set<number>>(new Set());
   const [storageHydrated, setStorageHydrated] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshingYear, setRefreshingYear] = useState<number | null>(null);
+  const [mutatingYear, setMutatingYear] = useState<number | null>(null);
   const [addYear, setAddYear] = useState<number | null>(null);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchDrawerOpen, setSearchDrawerOpen] = useState(false);
@@ -203,17 +202,12 @@ export function Dashboard() {
     try {
       const storedSeasons = localStorage.getItem(STORAGE_KEYS.expandedSeasons);
       const storedRounds = localStorage.getItem(STORAGE_KEYS.expandedRounds);
-      const storedHidden = localStorage.getItem(STORAGE_KEYS.hiddenSeasons);
 
       const parsedSeasons = storedSeasons ? JSON.parse(storedSeasons) : undefined;
       const parsedRounds = storedRounds ? JSON.parse(storedRounds) : undefined;
-      const parsedHidden = storedHidden
-        ? new Set((JSON.parse(storedHidden) as (number | string)[]).map(toId))
-        : undefined;
 
       if (parsedSeasons) setExpandedSeasons(parsedSeasons);
       if (parsedRounds) setExpandedRounds(parsedRounds);
-      if (parsedHidden) setHiddenSeasons(parsedHidden);
     } catch {
       // ignore corrupt storage
     }
@@ -230,21 +224,15 @@ export function Dashboard() {
     localStorage.setItem(STORAGE_KEYS.expandedRounds, JSON.stringify(expandedRounds));
   }, [expandedRounds, storageHydrated]);
 
-  useEffect(() => {
-    if (!storageHydrated) return;
-    localStorage.setItem(STORAGE_KEYS.hiddenSeasons, JSON.stringify(Array.from(hiddenSeasons)));
-  }, [hiddenSeasons, storageHydrated]);
-
   const fetchSeasons = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await apiFetch(`/seasons`);
+      const res = await apiFetch(`/seasons?include_deleted=true`);
       if (!res.ok) throw new Error(`Failed to load seasons (${res.status})`);
       const data = (await res.json()) as Season[];
-      const visible = data.filter((s) => !hiddenSeasons.has(toId(s.year)));
-      setSeasons(visible);
-      ensureStateForSeasons(visible);
+      setSeasons(data);
+      ensureStateForSeasons(data.filter((s) => !s.is_deleted));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -259,18 +247,13 @@ export function Dashboard() {
       const res = await apiFetch(`/seasons/${year}/refresh`, { method: "POST" });
       if (!res.ok) throw new Error(`Refresh failed (${res.status})`);
       const refreshed = (await res.json()) as Season;
-      const nextHidden = new Set(hiddenSeasons);
-      if (nextHidden.delete(toId(refreshed.year))) {
-        setHiddenSeasons(nextHidden);
-      }
       setSeasons((prev) => {
         const others = prev.filter((s) => s.year !== year);
         const merged = [refreshed, ...others].sort((a, b) => b.year - a.year);
-        const visible = merged.filter((s) => !nextHidden.has(toId(s.year)));
-        ensureStateForSeasons(visible);
+        ensureStateForSeasons(merged.filter((s) => !s.is_deleted));
         // Reset round expansion for this season so it reopens with rounds collapsed
         setExpandedRounds((rounds) => ({ ...rounds, [refreshed.id]: {} }));
-        return visible;
+        return merged;
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
@@ -340,10 +323,62 @@ export function Dashboard() {
     setExpandedRounds((prev) => ({ ...prev, [season.id]: next }));
   };
 
-  const hideSeason = (season: Season) => {
+  const handleHideSeason = async (season: Season) => {
     const year = toId(season.year);
-    setHiddenSeasons((prev) => new Set([...Array.from(prev), year]));
-    setSeasons((prev) => prev.filter((s) => toId(s.year) !== year));
+    setError(null);
+    setMutatingYear(year);
+    try {
+      const res = await apiFetch(`/seasons/${year}/hide`, { method: "POST" });
+      if (!res.ok) throw new Error(`Hide failed (${res.status})`);
+      const updated = (await res.json()) as Season;
+      setSeasons((prev) => {
+        const merged = [updated, ...prev.filter((s) => s.year !== year)].sort((a, b) => b.year - a.year);
+        ensureStateForSeasons(merged.filter((s) => !s.is_deleted));
+        return merged;
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to hide season");
+    } finally {
+      setMutatingYear(null);
+    }
+  };
+
+  const handleRestoreSeason = async (season: Season) => {
+    const year = toId(season.year);
+    setError(null);
+    setMutatingYear(year);
+    try {
+      const res = await apiFetch(`/seasons/${year}/restore`, { method: "POST" });
+      if (!res.ok) throw new Error(`Restore failed (${res.status})`);
+      const updated = (await res.json()) as Season;
+      setSeasons((prev) => {
+        const merged = [updated, ...prev.filter((s) => s.year !== year)].sort((a, b) => b.year - a.year);
+        ensureStateForSeasons(merged.filter((s) => !s.is_deleted));
+        return merged;
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to restore season");
+    } finally {
+      setMutatingYear(null);
+    }
+  };
+
+  const handleDeleteSeason = async (season: Season) => {
+    const year = toId(season.year);
+    if (!window.confirm(`Delete season ${year}? This removes rounds, events, and watchlist entries.`)) {
+      return;
+    }
+    setError(null);
+    setMutatingYear(year);
+    try {
+      const res = await apiFetch(`/seasons/${year}`, { method: "DELETE" });
+      if (!res.ok && res.status !== 204) throw new Error(`Delete failed (${res.status})`);
+      setSeasons((prev) => prev.filter((s) => s.year !== year));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete season");
+    } finally {
+      setMutatingYear(null);
+    }
   };
 
   const addSeason = async () => {
@@ -502,10 +537,6 @@ export function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageHydrated]);
 
-  useEffect(() => {
-    setSeasons((prev) => prev.filter((s) => !hiddenSeasons.has(toId(s.year))));
-  }, [hiddenSeasons]);
-
   const filteredResults = selectedEventFilter
     ? searchResults.filter((r) => {
         const label = (r.event_label || "Other").toLowerCase();
@@ -520,6 +551,9 @@ export function Dashboard() {
       ? "Auto download best"
       : `Auto download best ${selectedEventFilter}`;
   const autoDownloadDisabled = searching || normalizedFilter === "other";
+
+  const activeSeasons = seasons.filter((s) => !s.is_deleted);
+  const hiddenSeasons = seasons.filter((s) => s.is_deleted);
 
   const renderEvents = (season: Season, round: Round) => {
     const visibleEvents = filterEventsByAllowlist(round.events);
@@ -669,13 +703,13 @@ export function Dashboard() {
           </Alert>
         )}
 
-        {loading && !seasons.length ? (
+        {loading && !activeSeasons.length ? (
           <Group justify="center">
             <Loader />
           </Group>
-        ) : seasons.length ? (
+        ) : activeSeasons.length ? (
           <Stack gap="sm">
-            {seasons.map((season) => (
+            {activeSeasons.map((season) => (
               <Card key={season.id} withBorder padding="md">
                 <Group justify="space-between" align="flex-start">
                   <div>
@@ -702,8 +736,25 @@ export function Dashboard() {
                     >
                       Refresh season
                     </Button>
-                    <Button variant="subtle" size="xs" color="red" onClick={() => hideSeason(season)}>
-                      Remove from dashboard
+                    <Button
+                      variant="subtle"
+                      size="xs"
+                      color="red"
+                      onClick={() => handleHideSeason(season)}
+                      loading={mutatingYear === season.year}
+                      disabled={mutatingYear === season.year || refreshingYear === season.year}
+                    >
+                      Hide season
+                    </Button>
+                    <Button
+                      variant="light"
+                      size="xs"
+                      color="red"
+                      onClick={() => handleDeleteSeason(season)}
+                      loading={mutatingYear === season.year}
+                      disabled={mutatingYear === season.year || refreshingYear === season.year}
+                    >
+                      Delete
                     </Button>
                   </Group>
                 </Group>
@@ -714,6 +765,54 @@ export function Dashboard() {
         ) : (
           <Card withBorder padding="md">
             <Text c="dimmed">No seasons yet. Add a season year to begin.</Text>
+          </Card>
+        )}
+
+        {!!hiddenSeasons.length && (
+          <Card withBorder padding="md" radius="sm">
+            <Stack gap="sm">
+              <Group justify="space-between" align="center">
+                <Title order={4}>Hidden seasons</Title>
+                <Text size="sm" c="dimmed">
+                  Hidden seasons stay out of dropdowns and watchlists until you restore them.
+                </Text>
+              </Group>
+              <Stack gap="xs">
+                {hiddenSeasons.map((season) => (
+                  <Group key={`hidden-${season.id}`} justify="space-between" align="center">
+                    <div>
+                      <Text fw={600}>Season {season.year}</Text>
+                      <Text size="sm" c="dimmed">
+                        {season.last_refreshed
+                          ? `Last refreshed: ${new Date(season.last_refreshed).toLocaleString()}`
+                          : "Not refreshed yet"}
+                      </Text>
+                    </div>
+                    <Group gap="xs">
+                      <Button
+                        size="xs"
+                        variant="subtle"
+                        onClick={() => handleRestoreSeason(season)}
+                        loading={mutatingYear === season.year}
+                        disabled={mutatingYear === season.year}
+                      >
+                        Restore
+                      </Button>
+                      <Button
+                        size="xs"
+                        variant="light"
+                        color="red"
+                        onClick={() => handleDeleteSeason(season)}
+                        loading={mutatingYear === season.year}
+                        disabled={mutatingYear === season.year}
+                      >
+                        Delete
+                      </Button>
+                    </Group>
+                  </Group>
+                ))}
+              </Stack>
+            </Stack>
           </Card>
         )}
       </Stack>

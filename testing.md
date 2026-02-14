@@ -1,6 +1,6 @@
 ## Testing Checklist
 
-> Status note: Unchecked items are future work per the design doc unless noted as completed.
+> Status note: Unchecked items are future work per the design doc unless noted as completed. Pytest is installed but there are no automated tests yet ("0 tests collected" is expected for now).
 
 ### Pre-reqs
 - [x] Python 3.12 installed
@@ -17,7 +17,10 @@
 - [x] GET http://localhost:8000/api/readyz → {"status":"ready"}
 - [x] POST/GET http://localhost:8000/api/demo-seasons → three seasons (2026, 2025, 2024)
 - [x] POST http://localhost:8000/api/seasons/{year}/refresh → fetches rounds/events from f1api.dev
-- [x] GET http://localhost:8000/api/seasons → lists seasons (count 3)
+- [x] GET http://localhost:8000/api/seasons → lists seasons (count 3) excluding hidden by default
+- [x] POST http://localhost:8000/api/seasons/{year}/hide → hides a season and pauses its watchlist entries
+- [x] POST http://localhost:8000/api/seasons/{year}/restore → unhides a season and resumes its watchlist entries
+- [x] DELETE http://localhost:8000/api/seasons/{year} → removes a season + rounds/events/watchlist/cache
 - [x] GET http://localhost:8000/api/search-demo → returns 3 mock rows
 - [x] GET http://localhost:8000/api/logs → last 50 JSON log entries visible
 - [x] GET/POST http://localhost:8000/api/indexers → list/create indexers
@@ -25,7 +28,7 @@
 - [x] POST http://localhost:8000/api/indexers/{id}/test → connectivity check (caps)
 
 ### Frontend (local dev)
-- [x] Dashboard: add/refresh season by year; hide/unhide seasons persists; expand/collapse seasons and rounds persists; “Refresh list” reloads
+- [x] Dashboard: add/refresh season by year; hide seasons (soft delete) and restore from Hidden panel; hard delete from Hidden panel; expand/collapse seasons and rounds persists; “Refresh list” reloads
 - [x] Manual Search: shows results table with event labels; limit + allowlist toggle + raw toggle; Enter submits
 - [x] Logs: shows last log entries table (timestamp/level/message)
 > Note: frontend calls `VITE_API_URL` if provided, otherwise `http://localhost:8000/api`.

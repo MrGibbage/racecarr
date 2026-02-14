@@ -111,6 +111,40 @@ def _get_scheduler(request: Request):
     return scheduler
 
 
+def _season_query(session: Session, include_deleted: bool = False):
+    query = session.query(Season).options(selectinload(Season.rounds).selectinload(Round.events))
+    if not include_deleted:
+        query = query.filter(Season.is_deleted.is_(False))
+    return query
+
+
+def _pause_season_searches(session: Session, season_id: int, reason: str) -> None:
+    searches = (
+        session.query(ScheduledSearch)
+        .join(Round, Round.id == ScheduledSearch.round_id)
+        .filter(Round.season_id == season_id)
+        .all()
+    )
+    for s in searches:
+        s.status = "paused"
+        s.next_run_at = None
+        s.last_error = reason
+
+
+def _restore_season_searches(session: Session, scheduler, season_id: int) -> None:
+    now = datetime.utcnow()
+    searches = (
+        session.query(ScheduledSearch)
+        .join(Round, Round.id == ScheduledSearch.round_id)
+        .filter(Round.season_id == season_id)
+        .all()
+    )
+    for s in searches:
+        s.status = "pending"
+        s.last_error = None
+        s.next_run_at = scheduler.compute_next_run(s.event_start_utc, now)
+
+
 @router.get("/healthz", response_model=HealthStatus)
 def healthz() -> HealthStatus:
     return HealthStatus(status="ok")
@@ -300,15 +334,73 @@ def about(auth: AuthSession = Depends(require_auth)) -> AboutResponse:
 
 
 @router.get("/seasons", response_model=list[SeasonDetail])
-def list_seasons(session: Session = Depends(get_session), auth: AuthSession = Depends(require_auth)) -> list[SeasonDetail]:
-    seasons = (
-        session.query(Season)
-        .options(selectinload(Season.rounds).selectinload(Round.events))
-        .order_by(Season.year.desc())
-        .all()
-    )
-    log_response("list_seasons", count=len(seasons))
+def list_seasons(
+    include_deleted: bool = Query(False, description="Include hidden seasons"),
+    session: Session = Depends(get_session),
+    auth: AuthSession = Depends(require_auth),
+) -> list[SeasonDetail]:
+    seasons = _season_query(session, include_deleted=include_deleted).order_by(Season.year.desc()).all()
+    log_response("list_seasons", count=len(seasons), include_deleted=include_deleted)
     return seasons
+
+
+@router.post("/seasons/{year}/hide", response_model=SeasonDetail)
+def hide_season(
+    year: int,
+    session: Session = Depends(get_session),
+    auth: AuthSession = Depends(require_auth),
+) -> SeasonDetail:
+    season = _season_query(session, include_deleted=True).filter(Season.year == year).first()
+    if not season:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Season not found")
+    if not season.is_deleted:
+        season.is_deleted = True
+        _pause_season_searches(session, season.id, "Season hidden")
+        session.commit()
+        session.refresh(season)
+    log_response("season_hidden", year=year)
+    return season
+
+
+@router.post("/seasons/{year}/restore", response_model=SeasonDetail)
+def restore_season(
+    year: int,
+    request: Request,
+    session: Session = Depends(get_session),
+    auth: AuthSession = Depends(require_auth),
+) -> SeasonDetail:
+    scheduler = _get_scheduler(request)
+    season = _season_query(session, include_deleted=True).filter(Season.year == year).first()
+    if not season:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Season not found")
+    if season.is_deleted:
+        season.is_deleted = False
+        _restore_season_searches(session, scheduler, season.id)
+        session.commit()
+        session.refresh(season)
+    log_response("season_restored", year=year)
+    return season
+
+
+@router.delete("/seasons/{year}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_season(
+    year: int,
+    session: Session = Depends(get_session),
+    auth: AuthSession = Depends(require_auth),
+) -> None:
+    season: Season | None = session.query(Season).filter_by(year=year).first()
+    if not season:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Season not found")
+
+    round_ids = [rid for (rid,) in session.query(Round.id).filter_by(season_id=season.id).all()]
+    if round_ids:
+        session.query(ScheduledSearch).filter(ScheduledSearch.round_id.in_(round_ids)).delete(synchronize_session=False)
+        session.query(CachedSearch).filter(CachedSearch.round_id.in_(round_ids)).delete(synchronize_session=False)
+
+    session.delete(season)
+    session.commit()
+    log_response("season_deleted", year=year, rounds=len(round_ids))
+    return None
 
 
 @router.api_route("/demo-seasons", methods=["POST", "GET"], response_model=list[SeasonDetail])
@@ -329,12 +421,7 @@ def seed_demo_seasons(session: Session = Depends(get_session), auth: AuthSession
     session.commit()
     log_response("seed_demo_seasons", inserted=len(new_seasons), total=len(existing_years) + len(new_seasons))
     # Return all seasons sorted desc
-    return (
-        session.query(Season)
-        .options(selectinload(Season.rounds).selectinload(Round.events))
-        .order_by(Season.year.desc())
-        .all()
-    )
+    return _season_query(session).order_by(Season.year.desc()).all()
 
 @router.post("/seasons/{year}/refresh", response_model=SeasonDetail)
 def refresh_season_data(
@@ -402,6 +489,8 @@ def seed_demo_scheduler(
         season = Season(year=season_year, last_refreshed=now)
         session.add(season)
         session.flush()
+    else:
+        season.is_deleted = False
 
     round_obj = (
         session.query(Round)
@@ -964,6 +1053,8 @@ def search_round(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Round not found")
     if not round_obj.season:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Round missing season context")
+    if round_obj.season.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Round not found")
 
     cfg = get_search_settings(session)
     allowlist = set(cfg.event_allowlist or _DEFAULT_EVENT_ALLOWLIST)
@@ -1017,6 +1108,8 @@ def auto_grab_round(
 ) -> AutoGrabResponse:
     round_obj: Round | None = session.query(Round).options(selectinload(Round.events), selectinload(Round.season)).filter_by(id=round_id).first()
     if not round_obj or not round_obj.season:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Round not found")
+    if round_obj.season.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Round not found")
 
     cfg = get_search_settings(session)
@@ -1129,7 +1222,10 @@ def create_scheduled_search(
     auth: AuthSession = Depends(require_auth),
 ) -> ScheduledSearchOut:
     scheduler = _get_scheduler(request)
-    item = scheduler.create_search(session, payload)
+    try:
+        item = scheduler.create_search(session, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     log_response("scheduler_create", id=item.id, round_id=item.round_id, event_type=item.event_type)
     return item
 

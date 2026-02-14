@@ -6,6 +6,7 @@ class SeasonOut(BaseModel):
     id: int
     year: int
     last_refreshed: datetime | None = None
+    is_deleted: bool = False
 
     class Config:
         from_attributes = True
@@ -37,6 +38,7 @@ class SeasonDetail(BaseModel):
     id: int
     year: int
     last_refreshed: datetime | None = None
+    is_deleted: bool = False
     rounds: list[RoundOut] = Field(default_factory=list)
 
     class Config:

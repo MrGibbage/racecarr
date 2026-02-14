@@ -4,10 +4,10 @@ import asyncio
 from datetime import datetime, timedelta
 from typing import Iterable, Optional
 from loguru import logger
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from ..core.database import SessionLocal
-from ..models.entities import ScheduledSearch, Round, Downloader, Indexer
+from ..models.entities import ScheduledSearch, Round, Downloader, Indexer, Season
 from ..schemas.common import ScheduledSearchCreate, SearchSettings
 from ..services.app_config import get_search_settings, DEFAULT_AUTO_DOWNLOAD_THRESHOLD
 from ..services.downloader_client import send_to_downloader, list_history
@@ -72,6 +72,9 @@ class SchedulerService:
         with SessionLocal() as session:
             due_items = (
                 session.query(ScheduledSearch)
+                .join(Round, Round.id == ScheduledSearch.round_id)
+                .join(Season, Season.id == Round.season_id)
+                .filter(Season.is_deleted.is_(False))
                 .filter(ScheduledSearch.status.in_([STATUS_PENDING, STATUS_FAILED]))
                 .filter((ScheduledSearch.next_run_at.is_(None)) | (ScheduledSearch.next_run_at <= now))
                 .all()
@@ -83,7 +86,14 @@ class SchedulerService:
     async def poll_downloads(self) -> None:
         now = datetime.utcnow()
         with SessionLocal() as session:
-            waiting_items = session.query(ScheduledSearch).filter_by(status=STATUS_WAITING).all()
+            waiting_items = (
+                session.query(ScheduledSearch)
+                .join(Round, Round.id == ScheduledSearch.round_id)
+                .join(Season, Season.id == Round.season_id)
+                .filter(Season.is_deleted.is_(False))
+                .filter(ScheduledSearch.status == STATUS_WAITING)
+                .all()
+            )
             if not waiting_items:
                 return
 
@@ -163,12 +173,19 @@ class SchedulerService:
     async def _run_single(self, session: Session, item: ScheduledSearch, now: datetime) -> None:
         round_obj: Round | None = (
             session.query(Round)
+            .options(selectinload(Round.events), selectinload(Round.season))
             .filter_by(id=item.round_id)
             .first()
         )
         if not round_obj:
             item.status = STATUS_FAILED
             item.last_error = "Round not found"
+            item.next_run_at = None
+            return
+
+        if not round_obj.season or round_obj.season.is_deleted:
+            item.status = STATUS_PAUSED
+            item.last_error = "Season hidden"
             item.next_run_at = None
             return
 
@@ -265,6 +282,9 @@ class SchedulerService:
     def list_searches(self, session: Session) -> list[ScheduledSearch]:
         return (
             session.query(ScheduledSearch)
+            .join(Round, Round.id == ScheduledSearch.round_id)
+            .join(Season, Season.id == Round.season_id)
+            .filter(Season.is_deleted.is_(False))
             .order_by(ScheduledSearch.next_run_at.asc().nullsfirst(), ScheduledSearch.added_at.asc())
             .all()
         )
@@ -277,7 +297,14 @@ class SchedulerService:
         )
         if existing:
             return existing
-        round_obj: Round | None = session.query(Round).filter_by(id=payload.round_id).first()
+        round_obj: Round | None = (
+            session.query(Round)
+            .join(Season, Season.id == Round.season_id)
+            .filter(Round.id == payload.round_id, Season.is_deleted.is_(False))
+            .first()
+        )
+        if not round_obj:
+            raise ValueError("Round not found or season hidden")
         event_start = None
         if round_obj:
             for ev in round_obj.events or []:
@@ -299,6 +326,9 @@ class SchedulerService:
         session.commit()
         session.refresh(item)
         return item
+
+    def compute_next_run(self, event_start: Optional[datetime], now: Optional[datetime] = None) -> datetime:
+        return self._compute_next_run(event_start, now or datetime.utcnow())
 
     def update_search(
         self,

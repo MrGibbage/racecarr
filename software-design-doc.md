@@ -58,6 +58,7 @@ Shows at-a-glance information:
  - UI time display supports a user-selectable time zone override (defaults to browser local) alongside UTC; track-local shown when available
  - “Search all events” performs one round-level query across enabled indexers, caches results for 24 hours (with a reload override), and filters results by round/year + event type. Filters include the “big seven” plus “Other”.
  - “Auto download best” respects the selected filter: All sends the top-scoring item per event, a specific event sends only that event, and “Other” disables the button. It uses the score threshold/default downloader from Settings → Search & Quality.
+ - Seasons can be hidden (soft delete) to remove them from dropdowns and scheduler; hidden seasons appear in a Hidden panel where they can be restored or hard-deleted. Hard delete removes rounds/events/watchlist entries and cached searches.
 
 ## 2.4 Event Detail Screen  
 - All metadata for the round  
@@ -88,6 +89,7 @@ Each rule includes:
 - Active/inactive toggle  
 - Last run time  
 - Next scheduled run
+- Rules/watch entries belonging to hidden seasons are paused while hidden and resume when restored.
 
 ## 2.7 Downloads / History Screen  
 - Queue + completed downloads  
@@ -249,6 +251,7 @@ Tabs include:
 - id  
 - year  
 - last_refreshed  
+- is_deleted (soft delete flag; hidden seasons excluded from scheduler/UI until restored)  
 
 ### **Round**  
 - id  
@@ -317,7 +320,7 @@ Tabs include:
 
 ## 4.2 Persistence & Migrations  
 - **DB:** SQLite in `/config`.  
-- **Migrations:** Use Alembic to evolve schema; apply on startup.  
+- **Migrations:** Use Alembic to evolve schema; apply on startup. Startup also applies safety DDL for recent columns (e.g., scheduler overrides, season soft-delete flag) for existing DBs.  
 - **Key constraints:**  
   - `season.year` unique.  
   - `round` unique on `(season_id, round_number)`.  

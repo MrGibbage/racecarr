@@ -8,6 +8,7 @@ class Season(Base):
     id = Column(Integer, primary_key=True, index=True)
     year = Column(Integer, unique=True, nullable=False, index=True)
     last_refreshed = Column(DateTime, nullable=True)
+    is_deleted = Column(Boolean, nullable=False, default=False)
     rounds = relationship("Round", back_populates="season", cascade="all, delete-orphan")
 
 
