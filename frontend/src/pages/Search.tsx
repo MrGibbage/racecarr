@@ -5,6 +5,7 @@ import {
   Button,
   Group,
   Loader,
+  NumberInput,
   Paper,
   ScrollArea,
   Select,
@@ -13,6 +14,7 @@ import {
   Text,
   Title,
   TextInput,
+  Switch,
 } from "@mantine/core";
 import { apiFetch } from "../api";
 
@@ -25,6 +27,8 @@ type SearchResult = {
   leechers: number;
   quality: string;
   nzb_url?: string | null;
+  event_type?: string | null;
+  event_label?: string | null;
 };
 
 type Downloader = {
@@ -39,12 +43,21 @@ export function Search() {
   const [downloaders, setDownloaders] = useState<Downloader[]>([]);
   const [selectedDownloaderId, setSelectedDownloaderId] = useState<string | null>(null);
   const [query, setQuery] = useState("F1");
+  const [limit, setLimit] = useState<number>(50);
+  const [applyAllowlist, setApplyAllowlist] = useState<boolean>(true);
+  const [rawMode, setRawMode] = useState<boolean>(false);
 
   const runSearch = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await apiFetch(`/search?q=${encodeURIComponent(query)}`);
+      const params = new URLSearchParams({
+        q: query,
+        limit: String(limit || 25),
+        apply_allowlist: String(applyAllowlist && !rawMode),
+        raw: String(rawMode),
+      });
+      const res = await apiFetch(`/search?${params.toString()}`);
       if (!res.ok) throw new Error(`Search failed (${res.status})`);
       const data = (await res.json()) as SearchResult[];
       setResults(data);
@@ -73,6 +86,12 @@ export function Search() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    // Auto-refresh when toggling allowlist without requiring button click
+    runSearch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applyAllowlist, rawMode]);
+
   const sendToDownloader = async (row: SearchResult) => {
     if (!selectedDownloaderId || !row.nzb_url) return;
     const id = selectedDownloaderId;
@@ -93,7 +112,7 @@ export function Search() {
   return (
     <Stack gap="md">
       <Group justify="space-between" align="center">
-        <Title order={2}>Search</Title>
+        <Title order={2}>Manual Search</Title>
         <Group gap="sm">
           <TextInput
             label="Query"
@@ -101,6 +120,37 @@ export function Search() {
             value={query}
             onChange={(e) => setQuery(e.currentTarget.value)}
             maw={320}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                runSearch();
+              }
+            }}
+          />
+          <NumberInput
+            label="Limit"
+            description="Max results (per merged list)"
+            value={limit}
+            onChange={(val) => setLimit(Number(val) || 25)}
+            min={1}
+            max={100}
+            maw={160}
+          />
+          <Switch
+            label="Raw indexer search"
+            description="Bypass F1 filters/variants"
+            checked={rawMode}
+            onChange={(e) => {
+              const next = e.currentTarget.checked;
+              setRawMode(next);
+              if (next) setApplyAllowlist(false);
+            }}
+          />
+          <Switch
+            label="Filter to F1 event types"
+            checked={applyAllowlist}
+            onChange={(e) => setApplyAllowlist(e.currentTarget.checked)}
+            disabled={rawMode}
           />
           {downloaders.length > 0 && (
             <Select
@@ -136,6 +186,7 @@ export function Search() {
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>Title</Table.Th>
+                  <Table.Th>Event</Table.Th>
                   <Table.Th>Indexer</Table.Th>
                   <Table.Th>Quality</Table.Th>
                   <Table.Th ta="right">Size (MB)</Table.Th>
@@ -149,6 +200,15 @@ export function Search() {
                 {results.map((row) => (
                   <Table.Tr key={row.title}>
                     <Table.Td>{row.title}</Table.Td>
+                    <Table.Td>
+                      {row.event_label || row.event_type ? (
+                        <Badge color="grape" variant="light">
+                          {row.event_label || row.event_type}
+                        </Badge>
+                      ) : (
+                        ""
+                      )}
+                    </Table.Td>
                     <Table.Td>{row.indexer}</Table.Td>
                     <Table.Td>
                       <Badge color="blue" variant="light">

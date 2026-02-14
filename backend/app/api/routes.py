@@ -822,6 +822,8 @@ def _search_indexer_with_variants(indexer: Indexer, variants: list[str], limit: 
 def search(
     q: str,
     limit: int = 25,
+    apply_allowlist: bool = True,
+    raw: bool = False,
     event_types: list[str] | None = Query(None, description="Allowed event types (e.g. race,qualifying,sprint,sprint-qualifying,fp1)"),
     session: Session = Depends(get_session),
     auth: AuthSession = Depends(require_auth),
@@ -830,15 +832,15 @@ def search(
     if not query:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Query is required")
 
-    limit = max(1, min(limit, 50))
+    limit = max(1, min(limit, 100))
     cfg = get_search_settings(session)
     indexers = session.query(Indexer).filter_by(enabled=True).order_by(Indexer.name.asc()).all()
     if not indexers:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No enabled indexers")
 
-    variants = _query_variants(query)
+    variants = [query] if raw else _query_variants(query)
     base_allowlist = set(cfg.event_allowlist or _DEFAULT_EVENT_ALLOWLIST)
-    allowlist = _derive_event_allowlist(query, event_types, base_allowlist)
+    allowlist = set() if raw else (_derive_event_allowlist(query, event_types, base_allowlist) if apply_allowlist else set())
     all_results: list[SearchResult] = []
     seen_global: set[str | tuple[str, str]] = set()
     search_start = perf_counter()
@@ -864,7 +866,8 @@ def search(
         "search",
         count=len(all_results),
         query=query,
-        allowed=list(allowlist),
+        allowed=list(allowlist) if allowlist else "all",
+        raw=raw,
         variants=len(variants),
         indexers=len(indexers),
         type_counts=dict(type_counts),
