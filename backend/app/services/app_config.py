@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, Any
+import json
 from sqlalchemy.orm import Session
 from ..models.entities import AppConfig
 from ..core.config import get_settings
@@ -17,6 +18,19 @@ DEFAULT_MAX_RES = 2160
 DEFAULT_ALLOW_HDR = True
 DEFAULT_AUTO_DOWNLOAD_THRESHOLD = 50
 DEFAULT_EVENT_ALLOWLIST = ["race", "qualifying", "sprint", "sprint-qualifying", "fp1", "fp2", "fp3"]
+
+
+def _parse_json(value: str | None) -> Any:
+    if not value:
+        return None
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError:
+        return None
+
+
+def _dump_json(value: Any) -> str:
+    return json.dumps(value or [])
 
 
 def _normalize_level(level: str) -> LogLevel:
@@ -46,6 +60,9 @@ def ensure_app_config(session: Session) -> AppConfig:
         if not row.event_allowlist:
             row.event_allowlist = _join_csv(DEFAULT_EVENT_ALLOWLIST)
             changed = True
+        if row.notification_targets is None:
+            row.notification_targets = _dump_json([])
+            changed = True
         if changed:
             session.commit()
             session.refresh(row)
@@ -59,6 +76,7 @@ def ensure_app_config(session: Session) -> AppConfig:
         allow_hdr=DEFAULT_ALLOW_HDR,
         auto_download_threshold=DEFAULT_AUTO_DOWNLOAD_THRESHOLD,
         event_allowlist=_join_csv(DEFAULT_EVENT_ALLOWLIST),
+        notification_targets=_dump_json([]),
     )
     session.add(row)
     session.commit()
@@ -119,3 +137,18 @@ def update_search_settings(session: Session, payload: SearchSettings) -> SearchS
     session.commit()
     session.refresh(row)
     return get_search_settings(session)
+
+
+def list_notification_targets(session: Session) -> list[dict[str, Any]]:
+    row = ensure_app_config(session)
+    targets = _parse_json(row.notification_targets) or []
+    if not isinstance(targets, list):
+        targets = []
+    return targets
+
+
+def save_notification_targets(session: Session, targets: list[dict[str, Any]]) -> None:
+    row = ensure_app_config(session)
+    row.notification_targets = _dump_json(targets)
+    session.commit()
+    session.refresh(row)

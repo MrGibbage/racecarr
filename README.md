@@ -53,6 +53,8 @@ Search & auto-download
 - `POST /api/auth/password`
 - `GET/POST /api/settings/log-level`
 - `GET /api/settings/about`
+- `GET/POST/DELETE /api/notifications/targets`
+- `POST /api/notifications/test`
 - `GET /api/seasons`
 - `POST/GET /api/demo-seasons`
 - `POST /api/seasons/{year}/refresh`

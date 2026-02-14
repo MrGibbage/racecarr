@@ -50,6 +50,10 @@ from ..schemas.common import (
     ScheduledSearchOut,
     DemoSeedResponse,
     ScheduledSearchUpdate,
+    NotificationTarget,
+    NotificationTargetCreate,
+    NotificationTargets,
+    NotificationTestResponse,
 )
 from ..models.entities import Season, Round, Event, Indexer, Downloader, CachedSearch, ScheduledSearch
 from ..services.f1api import refresh_season
@@ -74,7 +78,10 @@ from ..services.app_config import (
     DEFAULT_ALLOW_HDR,
     DEFAULT_AUTO_DOWNLOAD_THRESHOLD,
     DEFAULT_EVENT_ALLOWLIST,
+    list_notification_targets,
+    save_notification_targets,
 )
+from ..services.notifications import send_notifications
 
 router = APIRouter()
 
@@ -109,6 +116,19 @@ def _get_scheduler(request: Request):
     if scheduler is None:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Scheduler not initialized")
     return scheduler
+
+
+def _scrub_targets(raw: list[dict]) -> list[dict]:
+    cleaned: list[dict] = []
+    for target in raw:
+        if not isinstance(target, dict):
+            continue
+        cleaned.append({
+            "type": target.get("type"),
+            "url": target.get("url"),
+            "name": target.get("name"),
+        })
+    return cleaned
 
 
 def _season_query(session: Session, include_deleted: bool = False):
@@ -251,6 +271,51 @@ def update_search_settings_endpoint(
     cfg = update_search_settings(session, payload)
     log_response("search_settings_updated")
     return cfg
+
+
+@router.get("/notifications/targets", response_model=NotificationTargets)
+def get_notification_targets(auth: AuthSession = Depends(require_auth), session: Session = Depends(get_session)) -> NotificationTargets:
+    targets = list_notification_targets(session)
+    return NotificationTargets(targets=_scrub_targets(targets))
+
+
+@router.post("/notifications/targets", response_model=NotificationTargets, status_code=status.HTTP_201_CREATED)
+def add_notification_target(
+    payload: NotificationTargetCreate,
+    auth: AuthSession = Depends(require_auth),
+    session: Session = Depends(get_session),
+) -> NotificationTargets:
+    targets = list_notification_targets(session)
+    targets.append(payload.model_dump())
+    save_notification_targets(session, targets)
+    log_response("notification_target_added", type=payload.type)
+    return NotificationTargets(targets=_scrub_targets(targets))
+
+
+@router.delete("/notifications/targets/{index}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_notification_target(
+    index: int,
+    auth: AuthSession = Depends(require_auth),
+    session: Session = Depends(get_session),
+) -> None:
+    targets = list_notification_targets(session)
+    if index < 0 or index >= len(targets):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification target not found")
+    targets.pop(index)
+    save_notification_targets(session, targets)
+    log_response("notification_target_deleted", index=index)
+    return None
+
+
+@router.post("/notifications/test", response_model=NotificationTestResponse)
+def send_notification_test(
+    auth: AuthSession = Depends(require_auth),
+    session: Session = Depends(get_session),
+) -> NotificationTestResponse:
+    targets = list_notification_targets(session)
+    ok, errors = send_notifications(targets, message="Racecarr test notification", title="Racecarr", event="test")
+    log_response("notification_test", ok=ok, target_count=len(targets))
+    return NotificationTestResponse(ok=ok, errors=errors)
 
 
 def _gather_backend_dependencies() -> list[DependencyVersion]:

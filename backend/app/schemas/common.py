@@ -235,6 +235,28 @@ class AboutResponse(BaseModel):
     server_started_at: str | None = None
 
 
+class NotificationTarget(BaseModel):
+    type: str
+    url: str
+    name: str | None = None
+
+
+class NotificationTargetCreate(BaseModel):
+    type: str
+    url: str
+    name: str | None = None
+    secret: str | None = None
+
+
+class NotificationTargets(BaseModel):
+    targets: list[NotificationTarget] = Field(default_factory=list)
+
+
+class NotificationTestResponse(BaseModel):
+    ok: bool
+    errors: list[str] = Field(default_factory=list)
+
+
 class ScheduledSearchCreate(BaseModel):
     round_id: int
     event_type: str

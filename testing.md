@@ -78,7 +78,7 @@
 - [ ] Configure media root/temp paths; free-space display works; warn on low space (non-blocking)
 
 ### Notifications (Apprise)
-- [ ] Add Apprise endpoint; test notification succeeds
+- [x] Add Apprise endpoint; test notification succeeds
 - [ ] Notifications fire on download start/complete/fail
 
 ### Logging & Support
