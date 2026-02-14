@@ -15,8 +15,21 @@ def send_notifications(
     data: dict[str, Any] | None = None,
 ) -> tuple[bool, list[str]]:
     errors: list[str] = []
+    # Never log or emit full notification URLs or secrets; only use minimal identifiers.
 
-    apprise_targets = [t for t in targets if t.get("type") == "apprise"]
+    allowed = []
+    for target in targets:
+        if not isinstance(target, dict):
+            continue
+        events = target.get("events") or []
+        if event and event != "test" and events and event not in events:
+            continue
+        allowed.append(target)
+
+    if not allowed:
+        return True, []
+
+    apprise_targets = [t for t in allowed if t.get("type") == "apprise"]
     if apprise_targets:
         try:
             ap_obj = Apprise()
@@ -29,11 +42,11 @@ def send_notifications(
                 if not ok:
                     errors.append("Apprise notify returned false")
         except Exception as exc:  # pragma: no cover - library failure path
-            logger.exception("Apprise notification failed")
-            errors.append(f"Apprise error: {exc}")
+            logger.error("Apprise notification failed", error_type=type(exc).__name__)
+            errors.append("Apprise error")
 
-    webhook_targets = [t for t in targets if t.get("type") == "webhook"]
-    for target in webhook_targets:
+    webhook_targets = [t for t in allowed if t.get("type") == "webhook"]
+    for idx, target in enumerate(webhook_targets):
         url = target.get("url")
         if not url:
             continue
@@ -45,9 +58,13 @@ def send_notifications(
         try:
             resp = httpx.post(url, json=payload, headers=headers, timeout=10)
             if resp.status_code >= 300:
-                errors.append(f"Webhook {url} returned {resp.status_code}")
+                errors.append(f"Webhook target {idx + 1} returned {resp.status_code}")
         except Exception as exc:
-            logger.exception("Webhook notification failed", url=url)
-            errors.append(f"Webhook {url} error: {exc}")
+            logger.error(
+                "Webhook notification failed",
+                target_index=idx,
+                error_type=type(exc).__name__,
+            )
+            errors.append(f"Webhook target {idx + 1} error")
 
     return (not errors), errors

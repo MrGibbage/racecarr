@@ -72,6 +72,11 @@ Search & auto-download
  - `DELETE /api/scheduler/searches/{id}`
  - `POST /api/scheduler/searches/{id}/run`
 
+## Notifications
+- Configure targets in Settings → Notifications (Apprise or webhook). Each target can select which events it listens to; new targets default to all events.
+- Implemented events: download-start, download-complete, download-fail (triggered when jobs are sent to the downloader and when polling detects completion/failure).
+- `/api/notifications/test` bypasses event filtering to verify connectivity.
+
 ## Frontend
 Vite + React + Mantine. Pages: Dashboard, Search, Scheduler, Settings, Logs. Proxy to backend on `/api` during `npm run dev`.
 

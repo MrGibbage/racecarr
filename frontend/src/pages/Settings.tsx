@@ -92,6 +92,25 @@ type SearchSettings = {
   event_allowlist: string[];
 };
 
+type NotificationTarget = {
+  type: string;
+  url: string;
+  name?: string | null;
+  events?: string[];
+};
+
+type NotificationTargetCreate = {
+  type: string;
+  url: string;
+  name?: string;
+  secret?: string;
+  events?: string[];
+};
+
+type NotificationTargetsResponse = {
+  targets: NotificationTarget[];
+};
+
 const stopKeyProp = (e: React.KeyboardEvent<HTMLInputElement>) => {
   e.stopPropagation();
   e.nativeEvent.stopImmediatePropagation?.();
@@ -175,6 +194,17 @@ const eventTypeOptions = [
   { value: "other", label: "Other" },
 ];
 
+const notificationTypeOptions = [
+  { value: "apprise", label: "Apprise URL" },
+  { value: "webhook", label: "Webhook" },
+];
+
+const notificationEventOptions = [
+  { value: "download-start", label: "Download start" },
+  { value: "download-complete", label: "Download complete" },
+  { value: "download-fail", label: "Download fail" },
+];
+
 export function Settings() {
   const [indexers, setIndexers] = useState<Indexer[]>([]);
   const [loading, setLoading] = useState(false);
@@ -219,6 +249,21 @@ export function Settings() {
   const [searchSettings, setSearchSettings] = useState<SearchSettings | null>(null);
   const [searchSettingsLoading, setSearchSettingsLoading] = useState(false);
   const [searchSettingsSaving, setSearchSettingsSaving] = useState(false);
+  const [notificationTargets, setNotificationTargets] = useState<NotificationTarget[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationSaving, setNotificationSaving] = useState(false);
+  const [notificationDeletingIndex, setNotificationDeletingIndex] = useState<number | null>(null);
+  const [editingNotificationIndex, setEditingNotificationIndex] = useState<number | null>(null);
+  const [editNotificationPayload, setEditNotificationPayload] = useState<NotificationTargetCreate | null>(null);
+  const [notificationSavingIndex, setNotificationSavingIndex] = useState<number | null>(null);
+  const [notificationTesting, setNotificationTesting] = useState(false);
+  const [newNotificationTarget, setNewNotificationTarget] = useState<NotificationTargetCreate>({
+    type: "apprise",
+    url: "",
+    name: "",
+    secret: "",
+    events: notificationEventOptions.map((opt) => opt.value),
+  });
   const logLevels = [
     { value: "TRACE", label: "Trace" },
     { value: "DEBUG", label: "Debug" },
@@ -284,6 +329,7 @@ export function Settings() {
     loadLogLevel();
     loadAbout();
     loadSearchSettings();
+    loadNotificationTargets();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -629,6 +675,143 @@ export function Settings() {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setLoggingOut(false);
+    }
+  };
+
+  const loadNotificationTargets = async () => {
+    setNotificationsLoading(true);
+    setError(null);
+    try {
+      const res = await apiFetch(`/notifications/targets`);
+      if (!res.ok) throw new Error(`Failed to load notification targets (${res.status})`);
+      const data = (await res.json()) as NotificationTargetsResponse;
+      setNotificationTargets(data.targets || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setNotificationsLoading(false);
+    }
+  };
+
+  const resetNotificationForm = () => {
+    setNewNotificationTarget({
+      type: "apprise",
+      url: "",
+      name: "",
+      secret: "",
+      events: notificationEventOptions.map((opt) => opt.value),
+    });
+  };
+
+  const startEditNotification = (index: number) => {
+    const target = notificationTargets[index];
+    if (!target) return;
+    setEditingNotificationIndex(index);
+    setEditNotificationPayload({
+      type: target.type,
+      url: target.url,
+      name: target.name || "",
+      secret: "",
+      events: target.events && target.events.length ? target.events : notificationEventOptions.map((opt) => opt.value),
+    });
+  };
+
+  const cancelEditNotification = () => {
+    setEditingNotificationIndex(null);
+    setEditNotificationPayload(null);
+  };
+
+  const saveEditNotification = async () => {
+    if (editingNotificationIndex === null || !editNotificationPayload) return;
+    setNotificationSavingIndex(editingNotificationIndex);
+    setError(null);
+    try {
+      // Delete old entry
+      const del = await apiFetch(`/notifications/targets/${editingNotificationIndex}`, { method: "DELETE" });
+      if (!del.ok) throw new Error(`Failed to update notification target (${del.status})`);
+
+      // Add updated entry
+      const add = await apiFetch(`/notifications/targets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: editNotificationPayload.type,
+          url: editNotificationPayload.url,
+          name: editNotificationPayload.name?.trim() || null,
+          secret: editNotificationPayload.secret ? editNotificationPayload.secret : null,
+        }),
+      });
+      if (!add.ok) throw new Error(`Failed to update notification target (${add.status})`);
+      const data = (await add.json()) as NotificationTargetsResponse;
+      setNotificationTargets(data.targets || []);
+      cancelEditNotification();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+      // Reload to avoid inconsistencies if only the delete succeeded
+      loadNotificationTargets();
+    } finally {
+      setNotificationSavingIndex(null);
+    }
+  };
+
+  const addNotificationTarget = async () => {
+    if (!newNotificationTarget.url) return;
+    setNotificationSaving(true);
+    setError(null);
+    try {
+      const res = await apiFetch(`/notifications/targets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: newNotificationTarget.type,
+          url: newNotificationTarget.url,
+          name: newNotificationTarget.name?.trim() || null,
+          secret: newNotificationTarget.secret ? newNotificationTarget.secret : null,
+          events: newNotificationTarget.events || [],
+        }),
+      });
+      if (!res.ok) throw new Error(`Failed to add notification target (${res.status})`);
+      const data = (await res.json()) as NotificationTargetsResponse;
+      setNotificationTargets(data.targets || []);
+      resetNotificationForm();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setNotificationSaving(false);
+    }
+  };
+
+  const deleteNotificationTarget = async (index: number) => {
+    setNotificationDeletingIndex(index);
+    setError(null);
+    try {
+      const res = await apiFetch(`/notifications/targets/${index}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(`Failed to delete notification target (${res.status})`);
+      setNotificationTargets((prev) => prev.filter((_, i) => i !== index));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setNotificationDeletingIndex(null);
+    }
+  };
+
+  const testNotifications = async () => {
+    setNotificationTesting(true);
+    setError(null);
+    try {
+      const res = await apiFetch(`/notifications/test`, { method: "POST" });
+      if (!res.ok) throw new Error(`Notification test failed (${res.status})`);
+      const data = (await res.json()) as { ok: boolean; errors: string[] };
+      if (data.ok) {
+        alert("Notification sent");
+      } else {
+        const detail = data.errors.length ? data.errors.join("; ") : "Unknown error";
+        alert(`Notification failed: ${detail}`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setNotificationTesting(false);
     }
   };
 
@@ -993,6 +1176,240 @@ export function Settings() {
             Save log level
           </Button>
         </Group>
+      </Paper>
+
+      <Paper withBorder p="md">
+        <Group justify="space-between" align="center" mb="sm">
+          <Title order={4}>Notifications</Title>
+          <Group gap="xs">
+            <Button
+              size="xs"
+              variant="light"
+              onClick={testNotifications}
+              loading={notificationTesting}
+              disabled={!notificationTargets.length}
+              type="button"
+            >
+              Send test
+            </Button>
+            <Button
+              size="xs"
+              variant="subtle"
+              onClick={loadNotificationTargets}
+              loading={notificationsLoading}
+              type="button"
+            >
+              Reload
+            </Button>
+          </Group>
+        </Group>
+        <Text size="sm" c="dimmed" mb="sm">
+          Send alerts through Apprise URLs (e.g. Discord, Slack, email) or a simple webhook. Secrets are only sent when creating a webhook target.
+        </Text>
+
+        <Group wrap="wrap" gap="sm" mb="sm" align="flex-end">
+          <Select
+            label="Type"
+            data={notificationTypeOptions}
+            value={newNotificationTarget.type}
+            onChange={(val) => setNewNotificationTarget((prev) => ({ ...prev, type: val || "apprise" }))}
+            maw={200}
+            comboboxProps={{ withinPortal: true }}
+          />
+          <TextInput
+            label="Name (optional)"
+            placeholder="Discord, Slack, Webhook"
+            value={newNotificationTarget.name || ""}
+            onChange={(e) => setNewNotificationTarget((prev) => ({ ...prev, name: e.currentTarget.value }))}
+            maw={220}
+            onKeyDown={stopKeyProp}
+          />
+          <TextInput
+            label={newNotificationTarget.type === "webhook" ? "Webhook URL" : "Apprise URL"}
+            placeholder={newNotificationTarget.type === "webhook" ? "https://example.com/webhook" : "discord://token"}
+            value={newNotificationTarget.url}
+            onChange={(e) => setNewNotificationTarget((prev) => ({ ...prev, url: e.currentTarget.value }))}
+            maw={360}
+            onKeyDown={stopKeyProp}
+          />
+          {newNotificationTarget.type === "webhook" && (
+            <PasswordInput
+              label="Secret (optional)"
+              placeholder="Shared secret header"
+              value={newNotificationTarget.secret || ""}
+              onChange={(e) => setNewNotificationTarget((prev) => ({ ...prev, secret: e.currentTarget.value }))}
+              maw={220}
+              onKeyDown={stopKeyProp}
+              autoComplete="off"
+            />
+          )}
+          <Checkbox.Group
+            value={newNotificationTarget.events || []}
+            onChange={(vals) => setNewNotificationTarget((prev) => ({ ...prev, events: vals }))}
+            label="Send for"
+          >
+            <Group gap="xs">
+              {notificationEventOptions.map((opt) => (
+                <Checkbox key={opt.value} value={opt.value} label={opt.label} />
+              ))}
+            </Group>
+          </Checkbox.Group>
+          <Button
+            type="button"
+            onClick={addNotificationTarget}
+            loading={notificationSaving}
+            disabled={!newNotificationTarget.url}
+          >
+            Add target
+          </Button>
+        </Group>
+
+        <Paper withBorder p="xs">
+          {notificationsLoading ? (
+            <Group justify="center" p="md">
+              <Loader />
+            </Group>
+          ) : notificationTargets.length ? (
+            <Table striped highlightOnHover withColumnBorders stickyHeader>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Type</Table.Th>
+                  <Table.Th>Name</Table.Th>
+                  <Table.Th>URL</Table.Th>
+                  <Table.Th>Actions</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {notificationTargets.map((target, index) => (
+                  <Table.Tr key={`${target.type}-${index}-${target.url}`}>
+                    <Table.Td w={180} miw={160} maw={200}>
+                      {editingNotificationIndex === index && editNotificationPayload ? (
+                        <Select
+                          data={notificationTypeOptions}
+                          value={editNotificationPayload.type}
+                          onChange={(val) => setEditNotificationPayload((prev) => (prev ? { ...prev, type: val || "apprise" } : prev))}
+                          size="xs"
+                          w="100%"
+                          maw="100%"
+                          comboboxProps={{ withinPortal: true }}
+                        />
+                      ) : (
+                        notificationTypeOptions.find((opt) => opt.value === target.type)?.label || target.type
+                      )}
+                    </Table.Td>
+                    <Table.Td w={220} miw={160} maw={240}>
+                      {editingNotificationIndex === index && editNotificationPayload ? (
+                        <TextInput
+                          value={editNotificationPayload.name || ""}
+                          onChange={(e) => setEditNotificationPayload((prev) => (prev ? { ...prev, name: e.currentTarget.value } : prev))}
+                          size="xs"
+                          placeholder="Name"
+                          onKeyDown={stopKeyProp}
+                          w="100%"
+                          maw="100%"
+                        />
+                      ) : (
+                        target.name || "(unnamed)"
+                      )}
+                    </Table.Td>
+                    <Table.Td w={420} miw={360} maw={520}>
+                      {editingNotificationIndex === index && editNotificationPayload ? (
+                        <Stack gap={4} w="100%">
+                          <TextInput
+                            value={editNotificationPayload.url}
+                            onChange={(e) => setEditNotificationPayload((prev) => (prev ? { ...prev, url: e.currentTarget.value } : prev))}
+                            size="xs"
+                            placeholder={editNotificationPayload.type === "webhook" ? "https://example.com/webhook" : "apprise://"}
+                            onKeyDown={stopKeyProp}
+                            w="100%"
+                            maw="100%"
+                          />
+                          {editNotificationPayload.type === "webhook" && (
+                            <PasswordInput
+                              value={editNotificationPayload.secret || ""}
+                              onChange={(e) => setEditNotificationPayload((prev) => (prev ? { ...prev, secret: e.currentTarget.value } : prev))}
+                              size="xs"
+                              placeholder="Secret (optional)"
+                              onKeyDown={stopKeyProp}
+                              autoComplete="off"
+                              w="100%"
+                              maw="100%"
+                            />
+                          )}
+                          <Checkbox.Group
+                            value={editNotificationPayload.events || []}
+                            onChange={(vals) => setEditNotificationPayload((prev) => (prev ? { ...prev, events: vals } : prev))}
+                            label="Send for"
+                          >
+                            <Group gap="xs">
+                              {notificationEventOptions.map((opt) => (
+                                <Checkbox key={opt.value} value={opt.value} label={opt.label} />
+                              ))}
+                            </Group>
+                          </Checkbox.Group>
+                        </Stack>
+                      ) : (
+                        <Stack gap={4} w="100%">
+                          <Text size="sm">{target.url}</Text>
+                          <Group gap="xs" wrap="wrap">
+                            {(target.events && target.events.length ? target.events : notificationEventOptions.map((opt) => opt.value)).map((ev) => {
+                              const label = notificationEventOptions.find((o) => o.value === ev)?.label || ev;
+                              return (
+                                <Badge key={ev} variant="light" color="gray">
+                                  {label}
+                                </Badge>
+                              );
+                            })}
+                          </Group>
+                        </Stack>
+                      )}
+                    </Table.Td>
+                    <Table.Td w={200} miw={160} maw={220}>
+                      <Group gap="xs">
+                        {editingNotificationIndex === index ? (
+                          <>
+                            <Button
+                              size="xs"
+                              variant="filled"
+                              onClick={saveEditNotification}
+                              loading={notificationSavingIndex === index}
+                              type="button"
+                            >
+                              Save
+                            </Button>
+                            <Button size="xs" variant="default" onClick={cancelEditNotification} type="button">
+                              Cancel
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button size="xs" variant="default" onClick={() => startEditNotification(index)} type="button">
+                              Edit
+                            </Button>
+                            <Button
+                              size="xs"
+                              color="red"
+                              variant="subtle"
+                              onClick={() => deleteNotificationTarget(index)}
+                              loading={notificationDeletingIndex === index}
+                              type="button"
+                            >
+                              Delete
+                            </Button>
+                          </>
+                        )}
+                      </Group>
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          ) : (
+            <Text c="dimmed" p="md">
+              No notification targets yet. Add an Apprise URL or webhook above.
+            </Text>
+          )}
+        </Paper>
       </Paper>
 
       <Paper withBorder p="md">

@@ -79,7 +79,14 @@
 
 ### Notifications (Apprise)
 - [x] Add Apprise endpoint; test notification succeeds
-- [ ] Notifications fire on download start/complete/fail
+- [x] Notifications fire on download start/complete/fail (per-target event filters)
+- [ ] Auto-download sends/skips emit notifications with title/downloader context
+- [ ] Scheduler refresh and search failures emit notifications
+- [ ] Indexer test/search errors emit notifications
+- [ ] Low-storage warning notification for configured media paths
+- [ ] Backup success/failure notifications
+- [ ] Auth/security alerts (optional) emit notifications
+- [ ] Add preset "Email" notification type (builds Apprise mailto URL client-side)
 
 ### Logging & Support
 - [x] Log file writes JSON with rotation/retention
