@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Badge,
@@ -172,6 +172,10 @@ export function Dashboard() {
   const [scheduledSearches, setScheduledSearches] = useState<ScheduledSearch[]>([]);
   const [watchlistMap, setWatchlistMap] = useState<Record<string, ScheduledSearch>>({});
   const [addingWatch, setAddingWatch] = useState<Record<string, boolean>>({});
+  const [hideCacheNotice, setHideCacheNotice] = useState(false);
+  const [autoDownloading, setAutoDownloading] = useState(false);
+  const [autoMessageKind, setAutoMessageKind] = useState<"info" | "success" | "warning" | "error">("success");
+  const autoMessageTimer = useRef<number | null>(null);
   const [downloaders, setDownloaders] = useState<Downloader[]>([]);
   const [selectedDownloaderId, setSelectedDownloaderId] = useState<string | null>(null);
   const [sending, setSending] = useState<Record<string, boolean>>({});
@@ -428,8 +432,10 @@ export function Dashboard() {
     setSearching(true);
     setSearchError(null);
     setAutoMessage(null);
+    setAutoMessageKind("info");
     setSearchResults([]);
     setUsingCache(false);
+    setHideCacheNotice(false);
     setCachedAt(null);
     if (!visibleEvents.length) {
       setSearchError("No events allowed by the current filter.");
@@ -511,7 +517,13 @@ export function Dashboard() {
   const autoDownloadBest = async () => {
     if (!activeRound) return;
     setSearchError(null);
-    setAutoMessage(null);
+    setAutoMessage("Starting auto-download...");
+    setAutoMessageKind("info");
+    setAutoDownloading(true);
+    if (autoMessageTimer.current) {
+      window.clearTimeout(autoMessageTimer.current);
+      autoMessageTimer.current = null;
+    }
 
     const normalizedFilter = selectedEventFilter?.toLowerCase();
     const eventTypesForFilter =
@@ -548,9 +560,13 @@ export function Dashboard() {
       const sentCount = data.sent.length;
       const skippedCount = data.skipped.length;
       setAutoMessage(`Auto-downloaded ${sentCount} item(s); skipped ${skippedCount}.`);
+      setAutoMessageKind("success");
+      autoMessageTimer.current = window.setTimeout(() => setAutoMessage(null), 6000);
     } catch (err) {
       setSearchError(err instanceof Error ? err.message : "Auto-download failed");
+      setAutoMessage(null);
     }
+    setAutoDownloading(false);
   };
 
   useEffect(() => {
@@ -576,6 +592,7 @@ export function Dashboard() {
       ? "Auto download best"
       : `Auto download best ${selectedEventFilter}`;
   const autoDownloadDisabled = searching || normalizedFilter === "other";
+  const autoButtonDisabled = autoDownloadDisabled || autoDownloading;
 
   const activeSeasons = seasons.filter((s) => !s.is_deleted);
   const hiddenSeasons = seasons.filter((s) => s.is_deleted);
@@ -883,12 +900,24 @@ export function Dashboard() {
             </Alert>
           )}
           {autoMessage && (
-            <Alert color="green" title="Auto download" variant="light">
+            <Alert
+              color={autoMessageKind === "info" ? "blue" : autoMessageKind === "success" ? "green" : autoMessageKind === "warning" ? "yellow" : "red"}
+              title="Auto download"
+              variant="light"
+              withCloseButton
+              onClose={() => setAutoMessage(null)}
+            >
               {autoMessage}
             </Alert>
           )}
-          {usingCache && (
-            <Alert color="yellow" title="Using cached results" variant="light">
+          {usingCache && !hideCacheNotice && (
+            <Alert
+              color="yellow"
+              title="Using cached results"
+              variant="light"
+              withCloseButton
+              onClose={() => setHideCacheNotice(true)}
+            >
               <Group justify="space-between" align="center">
                 <Text size="sm">
                   Cached at {cachedAt ? new Date(cachedAt).toLocaleString() : "unknown"}. Reload to refresh.
@@ -941,9 +970,9 @@ export function Dashboard() {
                   size="xs"
                   variant="filled"
                   onClick={autoDownloadBest}
-                  disabled={autoDownloadDisabled}
+                  disabled={autoButtonDisabled}
                 >
-                  {autoDownloadLabel}
+                  {autoDownloading ? "Auto downloading..." : autoDownloadLabel}
                 </Button>
                 <Select
                   placeholder="Select downloader"
