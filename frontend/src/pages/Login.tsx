@@ -34,7 +34,7 @@ export function Login() {
 
   return (
     <Stack align="center" mt="xl">
-      <Paper withBorder p="lg" miw={360} maw={420}>
+      <Paper withBorder p="lg" miw={420} maw={520}>
         <Stack gap="sm">
           <Title order={3}>Login</Title>
           {error && <Alert color="red" title="Error">{error}</Alert>}
@@ -42,6 +42,7 @@ export function Login() {
             label="Password"
             value={password}
             onChange={(e) => setPassword(e.currentTarget.value)}
+            maw={460}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();

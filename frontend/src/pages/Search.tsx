@@ -5,7 +5,6 @@ import {
   Button,
   Group,
   Loader,
-  NumberInput,
   Paper,
   ScrollArea,
   Select,
@@ -43,9 +42,16 @@ export function Search() {
   const [downloaders, setDownloaders] = useState<Downloader[]>([]);
   const [selectedDownloaderId, setSelectedDownloaderId] = useState<string | null>(null);
   const [query, setQuery] = useState("F1");
-  const [limit, setLimit] = useState<number>(50);
+  const [limit, setLimit] = useState<string>("50");
   const [applyAllowlist, setApplyAllowlist] = useState<boolean>(true);
   const [rawMode, setRawMode] = useState<boolean>(false);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("manualSearchLimit");
+    if (stored === "25" || stored === "50" || stored === "100") setLimit(stored);
+  }, []);
+
+  const effectiveLimit = Number(limit) || 50;
 
   const runSearch = async () => {
     setLoading(true);
@@ -53,7 +59,7 @@ export function Search() {
     try {
       const params = new URLSearchParams({
         q: query,
-        limit: String(limit || 25),
+        limit: String(effectiveLimit || 25),
         apply_allowlist: String(applyAllowlist && !rawMode),
         raw: String(rawMode),
       });
@@ -127,14 +133,22 @@ export function Search() {
               }
             }}
           />
-          <NumberInput
+          <Select
             label="Limit"
-            description="Max results (per merged list)"
+            description="Max results (capped at 100)"
+            data={[
+              { value: "25", label: "25" },
+              { value: "50", label: "50 (default)" },
+              { value: "100", label: "100" },
+            ]}
             value={limit}
-            onChange={(val) => setLimit(Number(val) || 25)}
-            min={1}
-            max={100}
-            maw={160}
+            onChange={(val) => {
+              const next = val === "25" || val === "50" || val === "100" ? val : "50";
+              setLimit(next);
+              localStorage.setItem("manualSearchLimit", next);
+            }}
+            maw={180}
+            comboboxProps={{ withinPortal: true }}
           />
           <Switch
             label="Raw indexer search"
