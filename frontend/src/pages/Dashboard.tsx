@@ -400,7 +400,7 @@ export function Dashboard() {
     const visibleEvents = filterEventsByAllowlist(round.events);
     const pastEvents = visibleEvents.filter(isPastEvent);
     setActiveRound({ season, round: { ...round, events: visibleEvents } });
-    setSearchTitle(`Event Results · ${season.year} ${round.name}`);
+    setSearchTitle(`Event Details · ${season.year} ${round.name}`);
     setSearchDrawerOpen(true);
     setSearching(true);
     setSearchError(null);
@@ -442,7 +442,7 @@ export function Dashboard() {
   const viewEventResults = async (season: Season, round: Round, ev: Event) => {
     if (!isPastEvent(ev)) return;
     setSelectedEventFilter(ev.type);
-    setSearchTitle(`Event Results · ${season.year} ${round.name} · ${ev.type}`);
+    setSearchTitle(`Event Details · ${season.year} ${round.name} · ${ev.type}`);
     if (activeRound?.round.id === round.id && searchResults.length) {
       setSearchDrawerOpen(true);
       return;
@@ -823,7 +823,7 @@ export function Dashboard() {
         onClose={() => setSearchDrawerOpen(false)}
         position="top"
         size="90vh"
-        title={searchTitle || "Search results"}
+        title={searchTitle || "Event Details"}
       >
         <Stack gap="sm">
           {searchError && (
