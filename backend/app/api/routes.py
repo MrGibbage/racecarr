@@ -1149,6 +1149,10 @@ def update_scheduled_search(
             search_id,
             downloader_id=payload.downloader_id,
             status=payload.status,
+            min_resolution=payload.min_resolution,
+            max_resolution=payload.max_resolution,
+            allow_hdr=payload.allow_hdr,
+            auto_download_threshold=payload.auto_download_threshold,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))

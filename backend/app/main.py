@@ -22,9 +22,31 @@ def _ensure_downloader_priority_column() -> None:
             conn.execute(text("ALTER TABLE downloader ADD COLUMN priority INTEGER"))
 
 
+def _ensure_scheduled_search_overrides() -> None:
+    inspector = inspect(engine)
+    if "scheduled_search" not in inspector.get_table_names():
+        return
+    cols = {col["name"] for col in inspector.get_columns("scheduled_search")}
+    alter_statements = []
+    if "min_resolution" not in cols:
+        alter_statements.append("ALTER TABLE scheduled_search ADD COLUMN min_resolution INTEGER")
+    if "max_resolution" not in cols:
+        alter_statements.append("ALTER TABLE scheduled_search ADD COLUMN max_resolution INTEGER")
+    if "allow_hdr" not in cols:
+        alter_statements.append("ALTER TABLE scheduled_search ADD COLUMN allow_hdr BOOLEAN")
+    if "auto_download_threshold" not in cols:
+        alter_statements.append("ALTER TABLE scheduled_search ADD COLUMN auto_download_threshold INTEGER")
+    if not alter_statements:
+        return
+    with engine.begin() as conn:
+        for stmt in alter_statements:
+            conn.execute(text(stmt))
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     _ensure_downloader_priority_column()
+    _ensure_scheduled_search_overrides()
     Base.metadata.create_all(bind=engine)
     with SessionLocal() as session:
         ensure_auth_row(session)

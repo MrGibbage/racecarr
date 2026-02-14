@@ -31,6 +31,7 @@ Scheduler page:
 - Polls every 15s for live updates.
 - Quick-add lets you enqueue all future events of a type for a season; respects duplicates.
 - Demo button (when `VITE_ALLOW_DEMO_SEED=true`) seeds a fake season and scheduled searches via `/api/demo/seed-scheduler`.
+- Each watch entry supports pause/resume and per-entry overrides for downloader, resolution range, HDR allowance, and score threshold.
 
 Search & auto-download
 - Event filter buttons show the big seven plus Other; All shows everything for the round.

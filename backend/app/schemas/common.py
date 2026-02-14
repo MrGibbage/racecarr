@@ -242,6 +242,10 @@ class ScheduledSearchCreate(BaseModel):
 class ScheduledSearchUpdate(BaseModel):
     downloader_id: int | None = None
     status: str | None = None
+    min_resolution: int | None = None
+    max_resolution: int | None = None
+    allow_hdr: bool | None = None
+    auto_download_threshold: int | None = None
 
 
 class ScheduledSearchOut(BaseModel):
@@ -258,6 +262,10 @@ class ScheduledSearchOut(BaseModel):
     nzb_url: str | None = None
     downloader_id: int | None = None
     attempts: int = 0
+    min_resolution: int | None = None
+    max_resolution: int | None = None
+    allow_hdr: bool | None = None
+    auto_download_threshold: int | None = None
 
     class Config:
         from_attributes = True
