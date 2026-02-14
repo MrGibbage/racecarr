@@ -705,9 +705,6 @@ export function Dashboard() {
                     <Button variant="subtle" size="xs" color="red" onClick={() => hideSeason(season)}>
                       Remove from dashboard
                     </Button>
-                    <Badge color="blue" variant="light">
-                      Active
-                    </Badge>
                   </Group>
                 </Group>
                 {isSeasonExpanded(season.id) && renderRounds(season)}
