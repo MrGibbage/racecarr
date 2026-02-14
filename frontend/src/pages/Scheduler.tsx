@@ -13,7 +13,6 @@ import {
   Table,
   Text,
   Title,
-  NumberInput,
   Checkbox,
 } from "@mantine/core";
 import { apiFetch } from "../api";
@@ -26,6 +25,13 @@ const EVENT_OPTIONS = [
   { value: "fp1", label: "FP1" },
   { value: "fp2", label: "FP2" },
   { value: "fp3", label: "FP3" },
+];
+
+const RES_OPTIONS = [
+  { value: "720", label: "720p" },
+  { value: "1080", label: "1080i" },
+  { value: "1080", label: "1080p" },
+  { value: "2160", label: "4K" },
 ];
 
 type Event = {
@@ -762,21 +768,21 @@ function EditModal({
     <Modal opened={opened} onClose={onClose} title="Edit watch settings" centered>
       <Stack gap="sm">
         <Group grow>
-          <NumberInput
+          <Select
             label="Min resolution"
             placeholder="Default"
-            value={minRes}
-            onChange={(val) => setMinRes(typeof val === "number" ? val : null)}
-            min={240}
-            max={4320}
+            data={RES_OPTIONS}
+            value={minRes ? String(minRes) : null}
+            onChange={(val) => setMinRes(val ? Number(val) : null)}
+            clearable
           />
-          <NumberInput
+          <Select
             label="Max resolution"
             placeholder="Default"
-            value={maxRes}
-            onChange={(val) => setMaxRes(typeof val === "number" ? val : null)}
-            min={240}
-            max={4320}
+            data={RES_OPTIONS}
+            value={maxRes ? String(maxRes) : null}
+            onChange={(val) => setMaxRes(val ? Number(val) : null)}
+            clearable
           />
         </Group>
         <Group justify="space-between" align="center">
@@ -789,13 +795,13 @@ function EditModal({
             Use default
           </Button>
         </Group>
-        <NumberInput
+        <Select
           label="Auto-download score threshold"
           placeholder="Default"
-          value={threshold}
-          onChange={(val) => setThreshold(typeof val === "number" ? val : null)}
-          min={0}
-          max={100}
+          data={["0","10","20","30","40","50","60","70","80","90","100"].map((v) => ({ value: v, label: v }))}
+          value={threshold !== null ? String(threshold) : null}
+          onChange={(val) => setThreshold(val !== null ? Number(val) : null)}
+          clearable
         />
         <Group justify="flex-end" gap="sm">
           <Button variant="default" onClick={onClose} disabled={busy}>
