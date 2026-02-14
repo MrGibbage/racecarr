@@ -400,7 +400,7 @@ export function Dashboard() {
     const visibleEvents = filterEventsByAllowlist(round.events);
     const pastEvents = visibleEvents.filter(isPastEvent);
     setActiveRound({ season, round: { ...round, events: visibleEvents } });
-    setSearchTitle(`Search: Round ${round.round_number} · ${round.name}`);
+    setSearchTitle(`Event Results · ${season.year} ${round.name}`);
     setSearchDrawerOpen(true);
     setSearching(true);
     setSearchError(null);
@@ -442,6 +442,7 @@ export function Dashboard() {
   const viewEventResults = async (season: Season, round: Round, ev: Event) => {
     if (!isPastEvent(ev)) return;
     setSelectedEventFilter(ev.type);
+    setSearchTitle(`Event Results · ${season.year} ${round.name} · ${ev.type}`);
     if (activeRound?.round.id === round.id && searchResults.length) {
       setSearchDrawerOpen(true);
       return;
