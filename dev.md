@@ -2,9 +2,10 @@
 
 ## Local development
 - Prereqs: Python 3.12, Node 20+, Docker Desktop (optional for end-to-end), uv (packaging).
-- Backend: `cd backend && uv sync --python "C:\\Python312\\python.exe" && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`.
-- Frontend: `cd frontend && npm install` (first run), then `npm run dev -- --host --port 5173` (uses `VITE_API_URL` if set, otherwise `http://localhost:8000/api`).
-- Docker (full stack): from repo root `docker compose up --build` (serves UI at `http://localhost:8080`, API at `/api`).
+- Backend: `cd backend && uv sync --python "C:\\Python312\\python.exe" && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000` (hot reload; stop with Ctrl+C).
+- Frontend: `cd frontend && npm install` (first run), then `npm run dev -- --host --port 5173` (reads `VITE_API_URL`, else `http://localhost:8000/api`).
+- Demo data: `POST /api/demo-seasons` seeds 2024–2026; the Dashboard/Search pages then have data to explore.
+- Docker (full stack): from repo root `docker compose up --build` (serves UI at `http://localhost:8080`, API at `/api`). Re-run `docker compose build` after backend/frontend changes.
 - Auth: single-user login; default password is `admin`. Change it in Settings → Security. Session cookie `rc_session` is httpOnly with remember-me + idle timeout refresh.
 
 ## Docker runbook
