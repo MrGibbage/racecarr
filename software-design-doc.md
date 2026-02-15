@@ -25,6 +25,10 @@ This application helps users **find, monitor, and download Formula One race even
 - Single-user authentication  
 - Extensible architecture for future motorsport series
 
+## 1.4 Doc Map & Current Status  
+- Run and ops instructions live in [dev.md](dev.md); manual test coverage and open gaps are tracked in [testing.md](testing.md) (no automated tests yet).  
+- Implementation snapshot (Feb 2026): indexer/download integrations, search + scoring, scheduler refresh, watch/rule handling, and Apprise targets are in place; downloader queue polling, richer notification coverage (scheduler/search failures, storage alerts), timezone display, backup workflow, and update checks remain future work per [testing.md](testing.md).
+
 ---
 
 # 2. **User Experience & Screens**

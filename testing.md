@@ -2,6 +2,12 @@
 
 > Status note: Unchecked items are future work per the design doc unless noted as completed. Pytest is installed but there are no automated tests yet ("0 tests collected" is expected for now).
 
+### How to run
+- Backend (dev): `cd backend && uv sync --python "C:\\Python312\\python.exe" && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
+- Frontend (dev): `cd frontend && npm install` (first run), then `npm run dev -- --host --port 5173` (defaults to `http://localhost:8000/api` if `VITE_API_URL` is unset)
+- Automated tests: `cd backend && uv run pytest -q` (currently reports `0 tests collected`)
+- Docker end-to-end: from repo root `docker compose up --build` (UI at http://localhost:8080, API at `/api`)
+
 ### Pre-reqs
 - [x] Python 3.12 installed
 - [x] Docker Desktop running
