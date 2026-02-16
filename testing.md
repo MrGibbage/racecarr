@@ -93,6 +93,9 @@
 - [ ] Backup success/failure notifications
 - [ ] Auth/security alerts (optional) emit notifications
 - [ ] Add preset "Email" notification type (builds Apprise mailto URL client-side)
+- [ ] Add doc/shortcut to fetch current log level via GET /api/settings/log-level (auth required)
+- [ ] Add doc/shortcut to set log level (POST /api/settings/log-level with {"log_level":"DEBUG"}) since env var overrides aren’t read after startup
+- [ ] Wire an Apprise-specific debug toggle (currently APPRISE_LOG_LEVEL env is ignored; rely on Apprise -vvv or global DEBUG)
 
 ### Logging & Support
 - [x] Log file writes JSON with rotation/retention
