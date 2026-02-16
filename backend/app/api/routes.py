@@ -55,6 +55,12 @@ from ..schemas.common import (
     NotificationTargetCreate,
     NotificationTargets,
     NotificationTestResponse,
+    SettingsExport,
+    SettingsImportRequest,
+    SettingsImportResult,
+    IndexerExport,
+    DownloaderExport,
+    NotificationTargetExport,
 )
 from ..models.entities import Season, Round, Event, Indexer, Downloader, CachedSearch, ScheduledSearch
 from ..services.f1api import refresh_season
@@ -81,6 +87,7 @@ from ..services.app_config import (
     DEFAULT_EVENT_ALLOWLIST,
     list_notification_targets,
     save_notification_targets,
+    _normalize_events,
 )
 from ..services.notifications import send_notifications
 from ..services.manual_downloads import record_manual_download
@@ -166,6 +173,127 @@ def _restore_season_searches(session: Session, scheduler, season_id: int) -> Non
         s.status = "pending"
         s.last_error = None
         s.next_run_at = scheduler.compute_next_run(s.event_start_utc, now)
+
+
+def _serialize_notification_target(target: dict, include_secrets: bool) -> NotificationTargetExport:
+    return NotificationTargetExport(
+        type=str(target.get("type") or ""),
+        url=str(target.get("url") or ""),
+        name=target.get("name"),
+        events=_normalize_events(target.get("events")),
+        secret=target.get("secret") if include_secrets else None,
+    )
+
+
+def _merge_notification_targets(
+    existing: list[dict], incoming: list[dict], preserve_secrets: bool = True
+) -> list[dict]:
+    def _key(item: dict) -> tuple[str, str, str]:
+        return (
+            (item.get("type") or "").strip().lower(),
+            (item.get("url") or "").strip(),
+            (item.get("name") or "").strip(),
+        )
+
+    merged: dict[tuple[str, str, str], dict] = {}
+    for item in existing:
+        merged[_key(item)] = item
+
+    for item in incoming:
+        key = _key(item)
+        current = merged.get(key, {})
+        secret = item.get("secret")
+        if secret is None and preserve_secrets:
+            secret = current.get("secret")
+        merged[key] = {
+            "type": item.get("type") or current.get("type"),
+            "url": item.get("url") or current.get("url"),
+            "name": item.get("name") or current.get("name"),
+            "events": _normalize_events(item.get("events") or current.get("events")),
+            "secret": secret,
+        }
+
+    return list(merged.values())
+
+
+def _import_indexers(
+    session: Session,
+    items: list[IndexerExport],
+    *,
+    replace_existing: bool,
+    preserve_secrets: bool,
+) -> int:
+    existing_by_name: dict[str, Indexer] = {}
+    if not replace_existing:
+        for row in session.query(Indexer).all():
+            existing_by_name[row.name.strip().lower()] = row
+
+    count = 0
+    for item in items:
+        key = (item.name or "").strip().lower()
+        target = existing_by_name.get(key) if not replace_existing else None
+        if target is None:
+            target = Indexer(
+                name=item.name,
+                api_url=item.api_url,
+                api_key=item.api_key,
+                category=item.category,
+                enabled=item.enabled,
+            )
+            session.add(target)
+        else:
+            target.name = item.name
+            target.api_url = item.api_url
+            target.category = item.category
+            target.enabled = item.enabled
+            if item.api_key is not None or not preserve_secrets:
+                target.api_key = item.api_key
+        count += 1
+
+    session.commit()
+    return count
+
+
+def _import_downloaders(
+    session: Session,
+    items: list[DownloaderExport],
+    *,
+    replace_existing: bool,
+    preserve_secrets: bool,
+) -> int:
+    existing_by_name: dict[str, Downloader] = {}
+    if not replace_existing:
+        for row in session.query(Downloader).all():
+            existing_by_name[row.name.strip().lower()] = row
+
+    count = 0
+    for item in items:
+        key = (item.name or "").strip().lower()
+        target = existing_by_name.get(key) if not replace_existing else None
+        if target is None:
+            target = Downloader(
+                name=item.name,
+                type=item.type,
+                api_url=item.api_url,
+                api_key=item.api_key,
+                category=item.category,
+                priority=item.priority,
+                enabled=item.enabled,
+            )
+            session.add(target)
+        else:
+            target.name = item.name
+            target.type = item.type
+            target.api_url = item.api_url
+            target.category = item.category
+            target.priority = item.priority
+            target.enabled = item.enabled
+            if item.api_key is not None or not preserve_secrets:
+                target.api_key = item.api_key
+        count += 1
+
+    session.commit()
+    return count
 
 
 @router.get("/healthz", response_model=HealthStatus)
@@ -274,6 +402,140 @@ def update_search_settings_endpoint(
     cfg = update_search_settings(session, payload)
     log_response("search_settings_updated")
     return cfg
+
+
+@router.get("/settings/export", response_model=SettingsExport)
+def export_settings(
+    include_secrets: bool = Query(False, description="Include API keys and secrets in the export"),
+    auth: AuthSession = Depends(require_auth),
+    session: Session = Depends(get_session),
+) -> SettingsExport:
+    cfg = get_app_config(session)
+    search = get_search_settings(session)
+    indexers = session.query(Indexer).order_by(Indexer.name.asc()).all()
+    downloaders = session.query(Downloader).order_by(Downloader.name.asc()).all()
+    targets = list_notification_targets(session)
+
+    export = SettingsExport(
+        version=get_settings().app_version,
+        generated_at=datetime.utcnow(),
+        include_secrets=include_secrets,
+        log_level=cfg.log_level,
+        search=search,
+        notification_targets=[_serialize_notification_target(t, include_secrets) for t in targets],
+        indexers=[
+            IndexerExport(
+                id=item.id,
+                name=item.name,
+                api_url=item.api_url,
+                api_key=item.api_key if include_secrets else None,
+                category=item.category,
+                enabled=item.enabled,
+            )
+            for item in indexers
+        ],
+        downloaders=[
+            DownloaderExport(
+                id=item.id,
+                name=item.name,
+                type=item.type,
+                api_url=item.api_url,
+                api_key=item.api_key if include_secrets else None,
+                category=item.category,
+                priority=item.priority,
+                enabled=item.enabled,
+            )
+            for item in downloaders
+        ],
+    )
+    log_response(
+        "settings_export",
+        include_secrets=include_secrets,
+        indexers=len(indexers),
+        downloaders=len(downloaders),
+        targets=len(targets),
+    )
+    return export
+
+
+@router.post("/settings/import", response_model=SettingsImportResult)
+def import_settings(
+    payload: SettingsImportRequest,
+    auth: AuthSession = Depends(require_auth),
+    session: Session = Depends(get_session),
+    replace_existing: bool = Query(False, description="Replace existing records instead of merging by name"),
+    preserve_existing_secrets: bool = Query(True, description="Keep stored secrets when the import omits them"),
+) -> SettingsImportResult:
+    data = payload.data
+    warnings: list[str] = []
+
+    current_version = get_settings().app_version
+    if data.version and data.version != current_version:
+        warnings.append(f"Imported version {data.version} differs from app version {current_version}")
+
+    try:
+        set_log_level(session, data.log_level)
+    except ValueError as exc:
+        warnings.append(str(exc))
+        session.refresh(get_app_config(session))
+
+    search = update_search_settings(session, data.search)
+
+    if replace_existing:
+        session.query(Indexer).delete(synchronize_session=False)
+        session.query(Downloader).delete(synchronize_session=False)
+        save_notification_targets(session, [])
+        session.commit()
+
+    imported_indexers = _import_indexers(
+        session,
+        data.indexers,
+        replace_existing=replace_existing,
+        preserve_secrets=preserve_existing_secrets,
+    )
+    imported_downloaders = _import_downloaders(
+        session,
+        data.downloaders,
+        replace_existing=replace_existing,
+        preserve_secrets=preserve_existing_secrets,
+    )
+
+    incoming_targets = [
+        {
+            "type": t.type,
+            "url": t.url,
+            "name": t.name,
+            "events": _normalize_events(t.events),
+            "secret": t.secret,
+        }
+        for t in data.notification_targets
+    ]
+    if replace_existing:
+        save_notification_targets(session, incoming_targets)
+        imported_targets = len(incoming_targets)
+    else:
+        merged_targets = _merge_notification_targets(list_notification_targets(session), incoming_targets, preserve_existing_secrets)
+        save_notification_targets(session, merged_targets)
+        imported_targets = len(merged_targets)
+
+    log_response(
+        "settings_import",
+        replace_existing=replace_existing,
+        indexers=imported_indexers,
+        downloaders=imported_downloaders,
+        targets=imported_targets,
+    )
+
+    return SettingsImportResult(
+        ok=True,
+        message="Settings imported",
+        imported_indexers=imported_indexers,
+        imported_downloaders=imported_downloaders,
+        imported_notification_targets=imported_targets,
+        log_level=data.log_level,
+        search=search,
+        warnings=warnings,
+    )
 
 
 @router.get("/notifications/targets", response_model=NotificationTargets)
