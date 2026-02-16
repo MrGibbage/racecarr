@@ -17,6 +17,25 @@ type LogEntry = {
   timestamp: string;
   level: string;
   message: string;
+  module?: string | null;
+  function?: string | null;
+  line?: number | null;
+  extra?: Record<string, unknown> | null;
+};
+
+const formatContext = (row: LogEntry) => {
+  const parts: string[] = [];
+  if (row.module) {
+    parts.push(row.line ? `${row.module}:${row.line}` : row.module);
+  }
+  if (row.function) {
+    parts.push(row.function);
+  }
+  if (row.extra) {
+    const extras = Object.entries(row.extra).map(([k, v]) => `${k}=${String(v)}`);
+    parts.push(...extras);
+  }
+  return parts.join(" · ");
 };
 
 export function Logs() {
@@ -71,7 +90,8 @@ export function Logs() {
                 <Table.Tr>
                   <Table.Th w="30%">Timestamp</Table.Th>
                   <Table.Th w="10%">Level</Table.Th>
-                  <Table.Th>Message</Table.Th>
+                  <Table.Th w="35%">Message</Table.Th>
+                  <Table.Th>Context</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -80,6 +100,11 @@ export function Logs() {
                     <Table.Td>{row.timestamp}</Table.Td>
                     <Table.Td>{row.level}</Table.Td>
                     <Table.Td>{row.message}</Table.Td>
+                    <Table.Td>
+                      <Text size="sm" c="dimmed">
+                        {formatContext(row) || ""}
+                      </Text>
+                    </Table.Td>
                   </Table.Tr>
                 ))}
               </Table.Tbody>

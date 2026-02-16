@@ -1657,11 +1657,25 @@ def recent_logs(auth: AuthSession = Depends(require_auth)) -> list[LogEntry]:
         try:
             data = json.loads(line)
             record = data.get("record", {})
+            raw_extra = record.get("extra") or {}
+            if not isinstance(raw_extra, dict):
+                raw_extra = {"value": raw_extra}
+            extra = {}
+            for key, val in raw_extra.items():
+                try:
+                    json.dumps(val)
+                    extra[key] = val
+                except Exception:
+                    extra[key] = str(val)
             entries.append(
                 LogEntry(
                     timestamp=record.get("time", {}).get("repr") or record.get("time") or data.get("time", ""),
                     level=record.get("level", {}).get("name", "") or str(record.get("level", "")),
                     message=record.get("message") or data.get("message") or data.get("text", ""),
+                    module=record.get("module") or record.get("name"),
+                    function=record.get("function"),
+                    line=record.get("line"),
+                    extra=extra or None,
                 )
             )
         except Exception:

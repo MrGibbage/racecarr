@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 from pydantic import BaseModel, Field
 
 
@@ -69,6 +70,10 @@ class LogEntry(BaseModel):
     timestamp: str
     level: str
     message: str
+    module: str | None = None
+    function: str | None = None
+    line: int | None = None
+    extra: dict[str, Any] | None = None
 
 
 class CachedSearchResponse(BaseModel):
