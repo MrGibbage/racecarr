@@ -44,3 +44,37 @@ def test_notifications_crud_and_test(client, monkeypatch):
     body = resp.json()
     assert body["ok"] is True
     assert called.get("targets") is not None
+
+
+def test_notifications_test_single(client, monkeypatch):
+    _login(client)
+
+    # Seed two targets so we can test indexing and invalid index handling.
+    client.post(
+        "/api/notifications/targets",
+        json={"type": "apprise", "url": "discord://token/webhook", "name": "Discord"},
+    )
+    client.post(
+        "/api/notifications/targets",
+        json={"type": "webhook", "url": "https://example.com/hook", "name": "Hook"},
+    )
+
+    sent = {}
+
+    def _fake_send(targets, **kwargs):
+        sent["targets"] = targets
+        return True, []
+
+    monkeypatch.setattr("app.api.routes.send_notifications", _fake_send)
+
+    # Valid index
+    resp = client.post("/api/notifications/test/1")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["ok"] is True
+    assert body["errors"] == []
+    assert sent.get("targets") and len(sent["targets"]) == 1
+
+    # Invalid index should 404
+    resp = client.post("/api/notifications/test/5")
+    assert resp.status_code == 404
