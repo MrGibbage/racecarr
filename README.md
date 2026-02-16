@@ -12,7 +12,7 @@ As of Feb 2026 (ver 0.1), this app is very early in testing because I am waiting
 
 - Prereqs: Docker Desktop (Windows/macOS) or Docker Engine + Compose plugin (Linux).
 - Clone the repo (or copy `docker-compose.yml`) and ensure a `config/` folder exists for the SQLite DB and logs.
-- From the repo root: `docker compose up --build` (add `-d` to detach). Linux is the same; verify with `docker compose version`.
+- From the repo root: `docker compose up -d` (pulls the image `mrgibbage/racecarr:latest`; use `--pull always` if you want to force-update). Linux is the same; verify with `docker compose version`.
 - App URL: http://localhost:8080 (API at `/api`). Default login is `admin`/`admin`; change it immediately in Settings → Security.
 
 ## Local development
@@ -50,13 +50,13 @@ As of Feb 2026 (ver 0.1), this app is very early in testing because I am waiting
 
 ## Docker compose (reference)
 
-If you just need the compose file, copy this into `docker-compose.yml` and run `docker compose up --build`:
+If you just need the compose file, copy this into `docker-compose.yml` and run `docker compose up -d`:
 
 ```yaml
 version: "3.9"
 services:
   app:
-    build: .
+    image: mrgibbage/racecarr:latest
     ports:
       - "8080:8080"
     volumes:
