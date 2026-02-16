@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 from pydantic import BaseModel, Field
 
 
@@ -69,6 +70,10 @@ class LogEntry(BaseModel):
     timestamp: str
     level: str
     message: str
+    module: str | None = None
+    function: str | None = None
+    line: int | None = None
+    extra: dict[str, Any] | None = None
 
 
 class CachedSearchResponse(BaseModel):
@@ -256,9 +261,16 @@ class NotificationTargets(BaseModel):
     targets: list[NotificationTarget] = Field(default_factory=list)
 
 
+class NotificationTestResult(BaseModel):
+    index: int
+    ok: bool
+    error: str | None = None
+
+
 class NotificationTestResponse(BaseModel):
     ok: bool
     errors: list[str] = Field(default_factory=list)
+    results: list[NotificationTestResult] = Field(default_factory=list)
 
 
 class NotificationTargetExport(BaseModel):

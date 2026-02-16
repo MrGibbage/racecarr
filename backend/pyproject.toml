@@ -1,6 +1,6 @@
 [project]
 name = "racecarr-backend"
-version = "0.1.0"
+version = "0.5.0-beta"
 description = "Racecarr backend service (FastAPI)"
 readme = "../README.md"
 requires-python = ">=3.12,<3.13"
