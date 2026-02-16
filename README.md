@@ -11,6 +11,7 @@ Racecarr is a small FastAPI + React app that searches F1 events across indexers 
 
 As of Feb 2026 (ver 0.5), this app is very early in testing because I am waiting for a live F1 season to actually test the scheduling. But if you want to give it a shot and provide me feedback, I could use the help!
 
+[Screenshots](https://github.com/MrGibbage/racecarr/blob/main/screenshots.md)
 ## Quick start (Docker)
 
 - Prereqs: Docker Desktop (Windows/macOS) or Docker Engine + Compose plugin (Linux).
