@@ -13,6 +13,7 @@ from uuid import uuid4
 from loguru import logger
 from sqlalchemy.orm import selectinload
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Query
+from fastapi.responses import FileResponse
 from sqlalchemy import text, select
 from sqlalchemy.orm import Session
 from ..core.database import get_session
@@ -55,6 +56,7 @@ from ..schemas.common import (
     NotificationTargetCreate,
     NotificationTargets,
     NotificationTestResponse,
+    NotificationTestResult,
     SettingsExport,
     SettingsImportRequest,
     SettingsImportResult,
@@ -578,9 +580,38 @@ def send_notification_test(
     session: Session = Depends(get_session),
 ) -> NotificationTestResponse:
     targets = list_notification_targets(session)
-    ok, errors = send_notifications(targets, message="Racecarr test notification", title="Racecarr", event="test")
-    log_response("notification_test", ok=ok, target_count=len(targets))
-    return NotificationTestResponse(ok=ok, errors=errors)
+    results: list[NotificationTestResult] = []
+    errors: list[str] = []
+    all_ok = True
+    for idx, target in enumerate(targets):
+        ok, errs = send_notifications([target], message="Racecarr test notification", title="Racecarr", event="test")
+        if not ok:
+            all_ok = False
+        if errs:
+            errors.extend(errs)
+        results.append(NotificationTestResult(index=idx, ok=ok, error=errs[0] if errs else None))
+    log_response(
+        "notification_test",
+        ok=all_ok,
+        target_count=len(targets),
+        error_count=len(errors),
+    )
+    return NotificationTestResponse(ok=all_ok, errors=errors, results=results)
+
+
+@router.post("/notifications/test/{index}", response_model=NotificationTestResponse)
+def send_notification_test_single(
+    index: int,
+    auth: AuthSession = Depends(require_auth),
+    session: Session = Depends(get_session),
+) -> NotificationTestResponse:
+    targets = list_notification_targets(session)
+    if index < 0 or index >= len(targets):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification target not found")
+    target = targets[index]
+    ok, errors = send_notifications([target], message="Racecarr test notification", title="Racecarr", event="test")
+    log_response("notification_test_single", ok=ok, index=index, error_count=len(errors))
+    return NotificationTestResponse(ok=ok, errors=errors, results=[NotificationTestResult(index=index, ok=ok, error=errors[0] if errors else None)])
 
 
 def _gather_backend_dependencies() -> list[DependencyVersion]:
@@ -1507,7 +1538,9 @@ def auto_grab_round(
 
     for label, item in best_by_label.items():
         if not item.nzb_url:
-            skipped.append(f"Missing NZB for {label}: {item.title}")
+            warning_msg = f"Missing NZB for {label}: {item.title}"
+            logger.warning("autograb_missing_nzb", round_id=round_id, label=label, title=item.title)
+            skipped.append(warning_msg)
             continue
         tag = f"rc-autograb-{uuid4()}"
         title_with_tag = f"{item.title} [{tag}]"
@@ -1541,6 +1574,16 @@ def auto_grab_round(
                 )
             )
         else:
+            logger.warning(
+                "autograb_send_failed",
+                round_id=round_id,
+                label=label,
+                title=item.title,
+                downloader_id=downloader.id,
+                downloader=downloader.name,
+                reason=message,
+                tag=tag,
+            )
             skipped.append(f"{label}: {message}")
 
     log_response("auto_grab_round", round_id=round_id, sent=len(sent), skipped=len(skipped))
@@ -1657,17 +1700,60 @@ def recent_logs(auth: AuthSession = Depends(require_auth)) -> list[LogEntry]:
         try:
             data = json.loads(line)
             record = data.get("record", {})
+            raw_extra = record.get("extra") or {}
+            if not isinstance(raw_extra, dict):
+                raw_extra = {"value": raw_extra}
+            extra = {}
+            for key, val in raw_extra.items():
+                try:
+                    json.dumps(val, default=str)
+                    extra[key] = val
+                except (TypeError, ValueError):
+                    extra[key] = repr(val)
             entries.append(
                 LogEntry(
                     timestamp=record.get("time", {}).get("repr") or record.get("time") or data.get("time", ""),
                     level=record.get("level", {}).get("name", "") or str(record.get("level", "")),
                     message=record.get("message") or data.get("message") or data.get("text", ""),
+                    module=record.get("module") or record.get("name"),
+                    function=record.get("function"),
+                    line=record.get("line"),
+                    extra=extra or None,
                 )
             )
         except Exception:
             continue
     log_response("recent_logs", count=len(entries))
     return entries
+
+
+@router.get("/logs/meta")
+def logs_meta(auth: AuthSession = Depends(require_auth)) -> dict:
+    settings = get_settings()
+    path = settings.log_path
+    exists = path.exists()
+    size_bytes: int | None = None
+    if exists:
+        try:
+            size_bytes = path.stat().st_size
+        except OSError:
+            size_bytes = None
+    return {
+        "path": str(path),
+        "exists": exists,
+        "size_bytes": size_bytes,
+        "rotation": "10 MB",
+        "retention": "14 days",
+    }
+
+
+@router.get("/logs/download")
+def download_logs(auth: AuthSession = Depends(require_auth)) -> FileResponse:
+    settings = get_settings()
+    path = settings.log_path
+    if not path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Log file not found")
+    return FileResponse(path, media_type="text/plain", filename="app.log")
 
 
 @router.get("/indexers", response_model=list[IndexerOut])
@@ -1764,7 +1850,14 @@ def create_downloader(
     session.add(item)
     session.commit()
     session.refresh(item)
-    log_response("create_downloader", id=item.id)
+    log_response(
+        "create_downloader",
+        id=item.id,
+        type=item.type,
+        category=item.category,
+        priority=item.priority,
+        enabled=item.enabled,
+    )
     return item
 
 
@@ -1796,7 +1889,14 @@ def update_downloader(
 
     session.commit()
     session.refresh(item)
-    log_response("update_downloader", id=item.id)
+    log_response(
+        "update_downloader",
+        id=item.id,
+        type=item.type,
+        category=item.category,
+        priority=item.priority,
+        enabled=item.enabled,
+    )
     return item
 
 
@@ -1821,7 +1921,7 @@ def test_downloader(
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Downloader not found")
     ok, message = test_downloader_connection(item)
-    log_response("test_downloader", id=downloader_id, ok=ok)
+    log_response("test_downloader", id=downloader_id, ok=ok, type=item.type)
     return DownloaderTestResult(ok=ok, message=message)
 
 
@@ -1844,7 +1944,15 @@ def send_to_downloader_route(
         category=payload.category or item.category,
         priority=payload.priority if payload.priority is not None else item.priority,
     )
-    log_response("send_to_downloader", id=downloader_id, ok=ok)
+    log_response(
+        "send_to_downloader",
+        id=downloader_id,
+        ok=ok,
+        title=payload.title,
+        tag=tag,
+        category=payload.category or item.category,
+        priority=payload.priority if payload.priority is not None else item.priority,
+    )
     if ok:
         try:
             record_manual_download(session, tag=tag, title=payload.title, downloader_id=downloader_id)
@@ -1860,4 +1968,15 @@ def send_to_downloader_route(
         except Exception:
             # Notification failures should not fail the send API
             pass
+    else:
+        logger.warning(
+            "manual_send_failed",
+            id=downloader_id,
+            downloader=item.name,
+            tag=tag,
+            title=payload.title,
+            category=payload.category or item.category,
+            priority=payload.priority if payload.priority is not None else item.priority,
+            reason=message,
+        )
     return DownloaderSendResult(ok=ok, message=message)

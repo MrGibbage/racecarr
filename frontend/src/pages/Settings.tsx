@@ -100,6 +100,12 @@ type NotificationTarget = {
   events?: string[];
 };
 
+type NotificationTestResult = {
+  index: number;
+  ok: boolean;
+  error?: string | null;
+};
+
 type NotificationTargetCreate = {
   type: string;
   url: string;
@@ -110,6 +116,12 @@ type NotificationTargetCreate = {
 
 type NotificationTargetsResponse = {
   targets: NotificationTarget[];
+};
+
+type NotificationTestResponse = {
+  ok: boolean;
+  errors: string[];
+  results?: NotificationTestResult[];
 };
 
 const stopKeyProp = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -258,6 +270,7 @@ export function Settings() {
   const [editNotificationPayload, setEditNotificationPayload] = useState<NotificationTargetCreate | null>(null);
   const [notificationSavingIndex, setNotificationSavingIndex] = useState<number | null>(null);
   const [notificationTesting, setNotificationTesting] = useState(false);
+  const [notificationTestingIndex, setNotificationTestingIndex] = useState<number | null>(null);
   const [newNotificationTarget, setNewNotificationTarget] = useState<NotificationTargetCreate>({
     type: "apprise",
     url: "",
@@ -882,9 +895,14 @@ export function Settings() {
     try {
       const res = await apiFetch(`/notifications/test`, { method: "POST" });
       if (!res.ok) throw new Error(`Notification test failed (${res.status})`);
-      const data = (await res.json()) as { ok: boolean; errors: string[] };
+      const data = (await res.json()) as NotificationTestResponse;
+      const results = data.results || [];
+      const failures = results.filter((r) => !r.ok);
       if (data.ok) {
-        alert("Notification sent");
+        alert("All notification targets succeeded");
+      } else if (failures.length) {
+        const detail = failures.map((r) => `Target ${r.index + 1}: ${r.error || "Unknown error"}`).join("; ");
+        alert(`Notification test failed: ${detail}`);
       } else {
         const detail = data.errors.length ? data.errors.join("; ") : "Unknown error";
         alert(`Notification failed: ${detail}`);
@@ -893,6 +911,27 @@ export function Settings() {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setNotificationTesting(false);
+    }
+  };
+
+  const testNotificationTarget = async (index: number) => {
+    setNotificationTestingIndex(index);
+    setError(null);
+    try {
+      const res = await apiFetch(`/notifications/test/${index}`, { method: "POST" });
+      if (!res.ok) throw new Error(`Notification test failed (${res.status})`);
+      const data = (await res.json()) as NotificationTestResponse;
+      const result = data.results && data.results[0];
+      if (data.ok && (result?.ok ?? true)) {
+        alert("Notification sent");
+      } else {
+        const detail = result?.error || data.errors[0] || "Unknown error";
+        alert(`Notification failed: ${detail}`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setNotificationTestingIndex(null);
     }
   };
 
@@ -1556,6 +1595,16 @@ export function Settings() {
                           </>
                         ) : (
                           <>
+                            <Button
+                              size="xs"
+                              variant="light"
+                              onClick={() => testNotificationTarget(index)}
+                              loading={notificationTestingIndex === index}
+                              disabled={notificationTesting}
+                              type="button"
+                            >
+                              Test
+                            </Button>
                             <Button size="xs" variant="default" onClick={() => startEditNotification(index)} type="button">
                               Edit
                             </Button>

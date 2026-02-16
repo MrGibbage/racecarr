@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from datetime import datetime, timedelta
 from typing import Iterable, Optional
 from loguru import logger
@@ -112,7 +113,16 @@ class SchedulerService:
             logger.warning("Notification dispatch failed", event=event, error_type=type(exc).__name__)
 
     async def run_due(self) -> None:
+        started = time.monotonic()
         now = datetime.utcnow()
+        ran = 0
+        status_counts = {
+            STATUS_WAITING: 0,
+            STATUS_PENDING: 0,
+            STATUS_FAILED: 0,
+            STATUS_COMPLETED: 0,
+            STATUS_PAUSED: 0,
+        }
         with SessionLocal() as session:
             due_items = (
                 session.query(ScheduledSearch)
@@ -123,12 +133,34 @@ class SchedulerService:
                 .filter((ScheduledSearch.next_run_at.is_(None)) | (ScheduledSearch.next_run_at <= now))
                 .all()
             )
+            due_count = len(due_items)
             for item in due_items:
                 await self._run_single(session, item, now)
+                ran += 1
+                status = item.status or "unknown"
+                if status in status_counts:
+                    status_counts[status] += 1
             session.commit()
+        duration_ms = int((time.monotonic() - started) * 1000)
+        logger.info(
+            "scheduler_run_due",
+            due=due_count,
+            ran=ran,
+            waiting=status_counts.get(STATUS_WAITING, 0),
+            pending=status_counts.get(STATUS_PENDING, 0),
+            failed=status_counts.get(STATUS_FAILED, 0),
+            completed=status_counts.get(STATUS_COMPLETED, 0),
+            paused=status_counts.get(STATUS_PAUSED, 0),
+            duration_ms=duration_ms,
+        )
 
     async def poll_downloads(self) -> None:
+        started = time.monotonic()
         now = datetime.utcnow()
+        waiting_completed = 0
+        waiting_failed = 0
+        manual_completed = 0
+        manual_failed = 0
         with SessionLocal() as session:
             waiting_items = (
                 session.query(ScheduledSearch)
@@ -140,11 +172,14 @@ class SchedulerService:
             )
             downloader_cache: dict[int, Downloader | None] = {}
             for item in waiting_items:
+                tag = self._ensure_tag(item)
                 downloader_id = item.downloader_id
                 if not downloader_id:
                     item.status = STATUS_FAILED
                     item.last_error = "Missing downloader"
                     item.next_run_at = self._compute_next_run(item.event_start_utc, now)
+                    waiting_failed += 1
+                    logger.warning("scheduler_poll_missing_downloader", search_id=item.id, tag=tag, round_id=item.round_id)
                     continue
 
                 downloader = downloader_cache.get(downloader_id)
@@ -155,9 +190,15 @@ class SchedulerService:
                     item.status = STATUS_FAILED
                     item.last_error = "Downloader not available"
                     item.next_run_at = self._compute_next_run(item.event_start_utc, now)
+                    waiting_failed += 1
+                    logger.warning(
+                        "scheduler_poll_downloader_unavailable",
+                        search_id=item.id,
+                        tag=tag,
+                        round_id=item.round_id,
+                        downloader_id=downloader_id,
+                    )
                     continue
-
-                tag = self._ensure_tag(item)
                 history = list_history(downloader, limit=80)
                 match = next((row for row in history if tag.lower() in (row.get("name") or "").lower()), None)
                 if not match:
@@ -169,6 +210,15 @@ class SchedulerService:
                     item.last_error = None
                     item.next_run_at = None
                     self._notify_event(session, event="download-complete", title=item.nzb_title or tag, downloader=downloader)
+                    waiting_completed += 1
+                    logger.info(
+                        "scheduler_poll_waiting_complete",
+                        search_id=item.id,
+                        tag=tag,
+                        round_id=item.round_id,
+                        downloader_id=downloader.id,
+                        title=item.nzb_title or tag,
+                    )
                 elif status in {"failed", "failure", "error"}:
                     item.status = STATUS_FAILED
                     item.last_error = "Downloader reported failure"
@@ -180,6 +230,15 @@ class SchedulerService:
                         downloader=downloader,
                         reason=item.last_error,
                     )
+                    waiting_failed += 1
+                    logger.warning(
+                        "scheduler_poll_waiting_failed",
+                        search_id=item.id,
+                        tag=tag,
+                        round_id=item.round_id,
+                        downloader_id=downloader.id,
+                        title=item.nzb_title or tag,
+                    )
 
             # Handle manual sends tagged with rc-manual-*
             manual_pending = list_manual_pending(session)
@@ -189,6 +248,8 @@ class SchedulerService:
                 title = pending.get("title") or tag
                 if not downloader_id:
                     update_manual_status(session, tag=tag, status=MANUAL_FAILED, last_error="Missing downloader")
+                    manual_failed += 1
+                    logger.warning("scheduler_poll_manual_missing_downloader", tag=tag, title=title)
                     continue
 
                 downloader = downloader_cache.get(downloader_id)
@@ -197,6 +258,10 @@ class SchedulerService:
                     downloader_cache[downloader_id] = downloader
                 if not downloader:
                     update_manual_status(session, tag=tag, status=MANUAL_FAILED, last_error="Downloader not available")
+                    manual_failed += 1
+                    logger.warning(
+                        "scheduler_poll_manual_downloader_unavailable", tag=tag, title=title, downloader_id=downloader_id
+                    )
                     continue
 
                 history = list_history(downloader, limit=80)
@@ -208,6 +273,14 @@ class SchedulerService:
                 if status in {"completed", "success", "ok"}:
                     update_manual_status(session, tag=tag, status=MANUAL_COMPLETED, last_error=None)
                     self._notify_event(session, event="download-complete", title=title, downloader=downloader)
+                    manual_completed += 1
+                    logger.info(
+                        "scheduler_poll_manual_complete",
+                        tag=tag,
+                        title=title,
+                        downloader_id=downloader.id,
+                        downloader=downloader.name,
+                    )
                 elif status in {"failed", "failure", "error"}:
                     update_manual_status(session, tag=tag, status=MANUAL_FAILED, last_error="Downloader reported failure")
                     self._notify_event(
@@ -217,8 +290,27 @@ class SchedulerService:
                         downloader=downloader,
                         reason="Downloader reported failure",
                     )
+                    manual_failed += 1
+                    logger.warning(
+                        "scheduler_poll_manual_failed",
+                        tag=tag,
+                        title=title,
+                        downloader_id=downloader.id,
+                        downloader=downloader.name,
+                    )
 
             session.commit()
+        duration_ms = int((time.monotonic() - started) * 1000)
+        logger.info(
+            "scheduler_poll_complete",
+            waiting=len(waiting_items),
+            manual_pending=len(manual_pending),
+            waiting_completed=waiting_completed,
+            waiting_failed=waiting_failed,
+            manual_completed=manual_completed,
+            manual_failed=manual_failed,
+            duration_ms=duration_ms,
+        )
 
     def _event_start_time(self, round_obj: Round, event_type: str) -> Optional[datetime]:
         target = event_type.lower()
@@ -346,6 +438,17 @@ class SchedulerService:
 
         tag = self._ensure_tag(item)
         title_with_tag = f"{best.title} [{tag}]"
+        logger.info(
+            "Scheduler send start",
+            downloader=downloader.name,
+            downloader_id=downloader.id,
+            tag=tag,
+            event_type=item.event_type,
+            round_id=item.round_id,
+            title=best.title,
+            priority=downloader.priority,
+            category=downloader.category,
+        )
         ok, message = send_to_downloader(
             downloader,
             nzb_url=best.nzb_url,
@@ -361,10 +464,29 @@ class SchedulerService:
             item.last_error = None
             item.next_run_at = now + timedelta(hours=6)  # safety retry window while waiting
             self._notify_event(session, event="download-start", title=best.title, downloader=downloader)
+            logger.info(
+                "Scheduler send ok",
+                downloader=downloader.name,
+                downloader_id=downloader.id,
+                tag=tag,
+                event_type=item.event_type,
+                round_id=item.round_id,
+                title=best.title,
+            )
         else:
             item.status = STATUS_PENDING
             item.last_error = message
             item.next_run_at = next_due
+            logger.warning(
+                "Scheduler send failed",
+                downloader=downloader.name,
+                downloader_id=downloader.id,
+                tag=tag,
+                event_type=item.event_type,
+                round_id=item.round_id,
+                title=best.title,
+                error=message,
+            )
 
     def list_searches(self, session: Session) -> list[ScheduledSearch]:
         return (
