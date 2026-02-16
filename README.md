@@ -1,5 +1,7 @@
 # Racecarr
 
+<img width="571" height="373" alt="image" src="https://github.com/user-attachments/assets/32ce0cb5-2c38-4d7d-b5ee-bff920f82c36" />
+
 ![Version](https://img.shields.io/badge/version-0.5.0--beta-blue)
 ![Python](https://img.shields.io/badge/python-3.12+-blue)
 ![Frontend](https://img.shields.io/badge/frontend-Vite%2FReact%2FMantine-00b894)
