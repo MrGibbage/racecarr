@@ -88,9 +88,9 @@ export function Logs() {
             <Table striped highlightOnHover withColumnBorders stickyHeader>
               <Table.Thead>
                 <Table.Tr>
-                  <Table.Th w="30%">Timestamp</Table.Th>
-                  <Table.Th w="10%">Level</Table.Th>
-                  <Table.Th w="35%">Message</Table.Th>
+                  <Table.Th w="15%">Timestamp</Table.Th>
+                  <Table.Th w="5%">Level</Table.Th>
+                  <Table.Th w="20%">Message</Table.Th>
                   <Table.Th>Context</Table.Th>
                 </Table.Tr>
               </Table.Thead>
