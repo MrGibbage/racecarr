@@ -1,8 +1,8 @@
 import { AppShell, Burger, Group, NavLink, ScrollArea } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { IconHome, IconSearch, IconSettings, IconListDetails, IconClockHour4 } from "@tabler/icons-react";
-import { Link, Route, Routes, useLocation } from "react-router-dom";
-import { useEffect } from "react";
+import { Link, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { Dashboard } from "./pages/Dashboard";
 import { Search } from "./pages/Search";
 import { Settings } from "./pages/Settings";
@@ -10,7 +10,7 @@ import { Logs } from "./pages/Logs";
 import { NotFound } from "./pages/NotFound";
 import { Login } from "./pages/Login";
 import { Scheduler } from "./pages/Scheduler";
-import { apiFetch } from "./api";
+import { apiFetch, API_BASE } from "./api";
 
 const navItems = [
   { label: "Dashboard", to: "/", icon: IconHome },
@@ -23,11 +23,47 @@ const navItems = [
 export default function App() {
   const [opened, { toggle, close }] = useDisclosure();
   const location = useLocation();
+  const navigate = useNavigate();
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isAuthed, setIsAuthed] = useState(false);
 
   useEffect(() => {
-    if (location.pathname === "/login") return;
-    apiFetch(`/auth/me`).catch(() => {});
-  }, [location.pathname]);
+    if (location.pathname === "/login") {
+      setAuthChecked(false);
+      setIsAuthed(false);
+      return;
+    }
+
+    setAuthChecked(false);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 10000);
+
+    fetch(`${API_BASE}/auth/me`, { credentials: "include", signal: controller.signal })
+      .then((res) => {
+        if (res.status === 401) {
+          setIsAuthed(false);
+          navigate("/login", { replace: true });
+          return;
+        }
+        if (res.ok) {
+          setIsAuthed(true);
+        }
+      })
+      .catch((err) => {
+        if (err instanceof DOMException && err.name === "AbortError") return; // timed out; keep current page
+        // Network/backend error: stay on page to avoid redirect loops and let user retry
+        console.warn("auth probe failed", err);
+      })
+      .finally(() => {
+        setAuthChecked(true);
+        clearTimeout(timeout);
+      });
+
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [location.pathname, navigate]);
 
   if (location.pathname === "/login") {
     return (
@@ -36,6 +72,10 @@ export default function App() {
         <Route path="*" element={<Login />} />
       </Routes>
     );
+  }
+
+  if (!authChecked && !isAuthed) {
+    return null; // wait for auth probe to finish to avoid flicker/loops
   }
 
   return (

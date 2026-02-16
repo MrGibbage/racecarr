@@ -261,6 +261,14 @@ class NotificationTestResponse(BaseModel):
     errors: list[str] = Field(default_factory=list)
 
 
+class NotificationTargetExport(BaseModel):
+    type: str
+    url: str
+    name: str | None = None
+    events: list[str] = Field(default_factory=list)
+    secret: str | None = None
+
+
 class ScheduledSearchCreate(BaseModel):
     round_id: int
     event_type: str
@@ -297,6 +305,40 @@ class ScheduledSearchOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class IndexerExport(IndexerBase):
+    id: int | None = None
+
+
+class DownloaderExport(DownloaderBase):
+    id: int | None = None
+
+
+class SettingsExport(BaseModel):
+    version: str
+    generated_at: datetime
+    include_secrets: bool = False
+    log_level: str
+    search: SearchSettings
+    notification_targets: list[NotificationTargetExport] = Field(default_factory=list)
+    indexers: list[IndexerExport] = Field(default_factory=list)
+    downloaders: list[DownloaderExport] = Field(default_factory=list)
+
+
+class SettingsImportRequest(BaseModel):
+    data: SettingsExport
+
+
+class SettingsImportResult(BaseModel):
+    ok: bool
+    message: str
+    imported_indexers: int
+    imported_downloaders: int
+    imported_notification_targets: int
+    log_level: str
+    search: SearchSettings
+    warnings: list[str] = Field(default_factory=list)
 
 
 class DemoSeedResponse(BaseModel):

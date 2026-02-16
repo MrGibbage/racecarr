@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
+  Anchor,
   Badge,
   Button,
   Group,
@@ -264,6 +265,14 @@ export function Settings() {
     secret: "",
     events: notificationEventOptions.map((opt) => opt.value),
   });
+  const [includeSecrets, setIncludeSecrets] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importReplaceExisting, setImportReplaceExisting] = useState(false);
+  const [importPreserveExistingSecrets, setImportPreserveExistingSecrets] = useState(true);
+  const [importSummary, setImportSummary] = useState<string | null>(null);
+  const [importFileName, setImportFileName] = useState<string>("");
+  const importInputRef = useRef<HTMLInputElement | null>(null);
   const logLevels = [
     { value: "TRACE", label: "Trace" },
     { value: "DEBUG", label: "Debug" },
@@ -662,6 +671,77 @@ export function Settings() {
       await navigator.clipboard.writeText(lines.join("\n"));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to copy");
+    }
+  };
+
+  const exportSettings = async () => {
+    setExporting(true);
+    setError(null);
+    try {
+      const res = await apiFetch(`/settings/export?include_secrets=${includeSecrets ? "true" : "false"}`);
+      if (!res.ok) throw new Error(`Export failed (${res.status})`);
+      const data = await res.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const suffix = includeSecrets ? "-with-secrets" : "";
+      a.href = url;
+      a.download = `racecarr-settings-export${suffix}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const triggerImportSelect = () => {
+    setImportSummary(null);
+    importInputRef.current?.click();
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.currentTarget.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    setImportSummary(null);
+    setImportFileName(file.name);
+    setError(null);
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const res = await apiFetch(
+        `/settings/import?replace_existing=${importReplaceExisting ? "true" : "false"}&preserve_existing_secrets=${
+          importPreserveExistingSecrets ? "true" : "false"
+        }`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ data: parsed }),
+        }
+      );
+      if (!res.ok) throw new Error(`Import failed (${res.status})`);
+      const data = await res.json();
+      setImportSummary(
+        `${data.message} — indexers: ${data.imported_indexers}, downloaders: ${data.imported_downloaders}, targets: ${data.imported_notification_targets}${
+          data.warnings && data.warnings.length ? ` (warnings: ${data.warnings.join("; ")})` : ""
+        }`
+      );
+      if (data.log_level) setLogLevel(data.log_level);
+      if (data.search) setSearchSettings(data.search);
+      loadIndexers();
+      loadDownloaders();
+      loadNotificationTargets();
+      loadSearchSettings();
+      loadLogLevel();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setImporting(false);
+      e.currentTarget.value = "";
     }
   };
 
@@ -1129,32 +1209,99 @@ export function Settings() {
         <Text size="sm" c="dimmed" mb="sm">
           Change the single-user password. You will stay signed in after changing.
         </Text>
-        <Group gap="sm" wrap="wrap">
-          <PasswordInput
-            label="Current password"
-            value={pwdCurrent}
-            onChange={(e) => setPwdCurrent(e.currentTarget.value)}
-            w={300}
-          />
-          <PasswordInput
-            label="New password"
-            value={pwdNew}
-            onChange={(e) => setPwdNew(e.currentTarget.value)}
-            w={300}
-          />
-          <PasswordInput
-            label="Confirm new password"
-            value={pwdConfirm}
-            onChange={(e) => setPwdConfirm(e.currentTarget.value)}
-            w={300}
-          />
+        <Group gap="sm" wrap="wrap" align="flex-end">
+          <Tooltip label="Single-user password; applies to all sessions" withArrow>
+            <PasswordInput
+              label="Current password"
+              value={pwdCurrent}
+              onChange={(e) => setPwdCurrent(e.currentTarget.value)}
+              w={300}
+            />
+          </Tooltip>
+          <Tooltip label="Single-user password; applies to all sessions" withArrow>
+            <PasswordInput
+              label="New password"
+              value={pwdNew}
+              onChange={(e) => setPwdNew(e.currentTarget.value)}
+              w={300}
+            />
+          </Tooltip>
+          <Tooltip label="Single-user password; applies to all sessions" withArrow>
+            <PasswordInput
+              label="Confirm new password"
+              value={pwdConfirm}
+              onChange={(e) => setPwdConfirm(e.currentTarget.value)}
+              w={300}
+            />
+          </Tooltip>
           <Button type="button" onClick={changePassword} loading={pwdSaving} disabled={!pwdCurrent || !pwdNew || !pwdConfirm}>
             Update password
           </Button>
-          <Button type="button" variant="outline" color="red" onClick={logout} loading={loggingOut}>
-            Log out
-          </Button>
+          <Tooltip label="Ends your current session only" withArrow>
+            <Button type="button" variant="outline" color="red" onClick={logout} loading={loggingOut}>
+              Log out
+            </Button>
+          </Tooltip>
         </Group>
+      </Paper>
+
+      <input
+        type="file"
+        accept="application/json"
+        ref={importInputRef}
+        style={{ display: "none" }}
+        onChange={handleImportFile}
+      />
+
+      <Paper withBorder p="md">
+        <Title order={4} mb="sm">
+          Backup & Import
+        </Title>
+        <Text size="sm" c="dimmed" mb="sm">
+          Export your settings to JSON or import them into another instance. Secrets are only included when you choose to include them.
+          Exports with secrets contain API keys and webhook secrets in plain text—keep them local and do not upload or share.
+        </Text>
+        <Stack gap="sm">
+          <Group gap="sm" align="center" wrap="wrap">
+            <Tooltip label="Include API keys and webhook secrets in the export" withArrow>
+              <Switch
+                label="Include secrets in export"
+                checked={includeSecrets}
+                onChange={(e) => setIncludeSecrets(e.currentTarget.checked)}
+              />
+            </Tooltip>
+            <Button type="button" onClick={exportSettings} loading={exporting}>
+              Export settings
+            </Button>
+          </Group>
+          <Group gap="sm" align="center" wrap="wrap">
+            <Tooltip label="Overwrite existing items instead of merging by name" withArrow>
+              <Switch
+                label="Replace existing on import"
+                checked={importReplaceExisting}
+                onChange={(e) => setImportReplaceExisting(e.currentTarget.checked)}
+              />
+            </Tooltip>
+            <Tooltip label="Keep stored secrets when the import omits them" withArrow>
+              <Switch
+                label="Preserve existing secrets"
+                checked={importPreserveExistingSecrets}
+                onChange={(e) => setImportPreserveExistingSecrets(e.currentTarget.checked)}
+              />
+            </Tooltip>
+            <Button type="button" variant="light" onClick={triggerImportSelect} loading={importing}>
+              {importing ? "Importing..." : "Import from file"}
+            </Button>
+            <Text size="sm" c="dimmed">
+              {importFileName ? `Selected: ${importFileName}` : "No file selected"}
+            </Text>
+          </Group>
+          {importSummary && (
+            <Text size="sm" c="dimmed">
+              {importSummary}
+            </Text>
+          )}
+        </Stack>
       </Paper>
 
       <Paper withBorder p="md">
@@ -1165,14 +1312,16 @@ export function Settings() {
           Choose the minimum log level for API and scheduler output. Changes apply immediately and persist.
         </Text>
         <Group gap="sm" align="flex-end" wrap="wrap">
-          <Select
-            label="Log level"
-            data={logLevels}
-            value={logLevel}
-            onChange={(val) => val && setLogLevel(val)}
-            maw={220}
-            disabled={logLevelLoading}
-          />
+          <Tooltip label="Applies immediately to API and scheduler logs" withArrow>
+            <Select
+              label="Log level"
+              data={logLevels}
+              value={logLevel}
+              onChange={(val) => val && setLogLevel(val)}
+              maw={220}
+              disabled={logLevelLoading}
+            />
+          </Tooltip>
           <Button type="button" onClick={saveLogLevel} loading={logLevelLoading}>
             Save log level
           </Button>
@@ -1183,16 +1332,18 @@ export function Settings() {
         <Group justify="space-between" align="center" mb="sm">
           <Title order={4}>Notifications</Title>
           <Group gap="xs">
-            <Button
-              size="xs"
-              variant="light"
-              onClick={testNotifications}
-              loading={notificationTesting}
-              disabled={!notificationTargets.length}
-              type="button"
-            >
-              Send test
-            </Button>
+            <Tooltip label="Sends a sample notification to all targets" withArrow>
+              <Button
+                size="xs"
+                variant="light"
+                onClick={testNotifications}
+                loading={notificationTesting}
+                disabled={!notificationTargets.length}
+                type="button"
+              >
+                Send test
+              </Button>
+            </Tooltip>
             <Button
               size="xs"
               variant="subtle"
@@ -1205,18 +1356,31 @@ export function Settings() {
           </Group>
         </Group>
         <Text size="sm" c="dimmed" mb="sm">
-          Send alerts through Apprise URLs (e.g. Discord, Slack, email) or a simple webhook. Secrets are only sent when creating a webhook target.
+          Send alerts through Apprise URLs (e.g. Discord, Slack, email) or a simple webhook. Secrets are only sent when creating a webhook target. For service examples, see the
+          {" "}
+          <Anchor href="https://appriseit.com/services/" target="_blank" rel="noreferrer">
+            Apprise service list
+          </Anchor>
+          {" "}
+          and the
+          {" "}
+          <Anchor href="https://appriseit.com/services/email/" target="_blank" rel="noreferrer">
+            Apprise email guide
+          </Anchor>
+          .
         </Text>
 
         <Group wrap="wrap" gap="sm" mb="sm" align="flex-end">
-          <Select
-            label="Type"
-            data={notificationTypeOptions}
-            value={newNotificationTarget.type}
-            onChange={(val) => setNewNotificationTarget((prev) => ({ ...prev, type: val || "apprise" }))}
-            maw={200}
-            comboboxProps={{ withinPortal: true }}
-          />
+          <Tooltip label="Apprise supports many services (Discord/Slack/email/etc.)" withArrow>
+            <Select
+              label="Type"
+              data={notificationTypeOptions}
+              value={newNotificationTarget.type}
+              onChange={(val) => setNewNotificationTarget((prev) => ({ ...prev, type: val || "apprise" }))}
+              maw={200}
+              comboboxProps={{ withinPortal: true }}
+            />
+          </Tooltip>
           <TextInput
             label="Name (optional)"
             placeholder="Discord, Slack, Webhook"
@@ -1225,14 +1389,20 @@ export function Settings() {
             maw={220}
             onKeyDown={stopKeyProp}
           />
-          <TextInput
-            label={newNotificationTarget.type === "webhook" ? "Webhook URL" : "Apprise URL"}
-            placeholder={newNotificationTarget.type === "webhook" ? "https://example.com/webhook" : "discord://token"}
-            value={newNotificationTarget.url}
-            onChange={(e) => setNewNotificationTarget((prev) => ({ ...prev, url: e.currentTarget.value }))}
-            maw={360}
-            onKeyDown={stopKeyProp}
-          />
+          <Tooltip
+            label={newNotificationTarget.type === "webhook" ? "POST webhook endpoint; optional secret header below" : "Paste the full Apprise URL (see docs links above)"}
+            withArrow
+          >
+            <TextInput
+              label={newNotificationTarget.type === "webhook" ? "Webhook URL" : "Apprise URL"}
+              placeholder={newNotificationTarget.type === "webhook" ? "https://example.com/webhook" : "discord://token"}
+              value={newNotificationTarget.url}
+              onChange={(e) => setNewNotificationTarget((prev) => ({ ...prev, url: e.currentTarget.value }))}
+              w="min(720px, 100%)"
+              miw={360}
+              onKeyDown={stopKeyProp}
+            />
+          </Tooltip>
           {newNotificationTarget.type === "webhook" && (
             <PasswordInput
               label="Secret (optional)"
@@ -1244,17 +1414,19 @@ export function Settings() {
               autoComplete="off"
             />
           )}
-          <Checkbox.Group
-            value={newNotificationTarget.events || []}
-            onChange={(vals) => setNewNotificationTarget((prev) => ({ ...prev, events: vals }))}
-            label="Send for"
-          >
-            <Group gap="xs">
-              {notificationEventOptions.map((opt) => (
-                <Checkbox key={opt.value} value={opt.value} label={opt.label} />
-              ))}
-            </Group>
-          </Checkbox.Group>
+          <Tooltip label="Choose which events trigger this target" withArrow>
+            <Checkbox.Group
+              value={newNotificationTarget.events || []}
+              onChange={(vals) => setNewNotificationTarget((prev) => ({ ...prev, events: vals }))}
+              label="Send for"
+            >
+              <Group gap="xs">
+                {notificationEventOptions.map((opt) => (
+                  <Checkbox key={opt.value} value={opt.value} label={opt.label} />
+                ))}
+              </Group>
+            </Checkbox.Group>
+          </Tooltip>
           <Button
             type="button"
             onClick={addNotificationTarget}
@@ -1427,97 +1599,121 @@ export function Settings() {
         ) : searchSettings ? (
           <Stack gap="sm">
             <Group gap="sm" align="flex-end" wrap="wrap">
-              <Select
-                label="Min resolution"
-                data={resolutionOptions(searchSettings.min_resolution)}
-                value={String(searchSettings.min_resolution)}
-                onChange={(val) =>
-                  setSearchSettings((prev) =>
-                    prev ? { ...prev, min_resolution: val ? Number(val) : prev.min_resolution } : prev
-                  )
-                }
-                maw={180}
-                comboboxProps={{ withinPortal: true }}
-              />
-              <Select
-                label="Max resolution"
-                data={resolutionOptions(searchSettings.max_resolution)}
-                value={String(searchSettings.max_resolution)}
-                onChange={(val) =>
-                  setSearchSettings((prev) =>
-                    prev ? { ...prev, max_resolution: val ? Number(val) : prev.max_resolution } : prev
-                  )
-                }
-                maw={180}
-                comboboxProps={{ withinPortal: true }}
-              />
-              <NumberInput
-                label="Auto-download threshold"
-                description="Score required to auto-send the best result"
-                value={searchSettings.auto_download_threshold}
-                onChange={(val) =>
-                  setSearchSettings((prev) =>
-                    prev
-                      ? { ...prev, auto_download_threshold: typeof val === "number" ? val : prev.auto_download_threshold }
-                      : prev
-                  )
-                }
-                min={0}
-                max={200}
-                allowDecimal={false}
-                maw={220}
-              />
+              <Tooltip label="Auto-downloads stay at or above this" withArrow position="top" withinPortal={false}>
+                <Select
+                  label="Min resolution"
+                  data={resolutionOptions(searchSettings.min_resolution)}
+                  value={String(searchSettings.min_resolution)}
+                  onChange={(val) =>
+                    setSearchSettings((prev) =>
+                      prev ? { ...prev, min_resolution: val ? Number(val) : prev.min_resolution } : prev
+                    )
+                  }
+                  maw={180}
+                  comboboxProps={{ withinPortal: true }}
+                />
+              </Tooltip>
+              <Tooltip label="Auto-downloads cap at this resolution" withArrow position="top" withinPortal={false}>
+                <Select
+                  label="Max resolution"
+                  data={resolutionOptions(searchSettings.max_resolution)}
+                  value={String(searchSettings.max_resolution)}
+                  onChange={(val) =>
+                    setSearchSettings((prev) =>
+                      prev ? { ...prev, max_resolution: val ? Number(val) : prev.max_resolution } : prev
+                    )
+                  }
+                  maw={180}
+                  comboboxProps={{ withinPortal: true }}
+                />
+              </Tooltip>
+              <Tooltip label="Score required before auto-send will fire" withArrow position="top" withinPortal={false}>
+                <NumberInput
+                  label="Auto-download threshold"
+                  description="Score required to auto-send the best result"
+                  value={searchSettings.auto_download_threshold}
+                  onChange={(val) =>
+                    setSearchSettings((prev) =>
+                      prev
+                        ? { ...prev, auto_download_threshold: typeof val === "number" ? val : prev.auto_download_threshold }
+                        : prev
+                    )
+                  }
+                  min={0}
+                  max={200}
+                  allowDecimal={false}
+                  maw={220}
+                />
+              </Tooltip>
             </Group>
-            <Checkbox.Group
-              label="Allowed event types"
-              description="Unchecked types are hidden and never sent (manual or automatic)"
-              value={searchSettings.event_allowlist || []}
-              onChange={(vals) => setSearchSettings((prev) => (prev ? { ...prev, event_allowlist: vals } : prev))}
+            <Tooltip
+              label="Unchecked types are hidden and never sent"
+              withArrow
+              position="top-start"
+              withinPortal={false}
+              offset={6}
             >
-              <Group gap="sm">
-                {eventTypeOptions.map((opt) => (
-                  <Checkbox key={opt.value} value={opt.value} label={opt.label} />
-                ))}
-              </Group>
-            </Checkbox.Group>
+              <div style={{ display: "inline-block" }}>
+                <Checkbox.Group
+                  label="Allowed event types"
+                  description="Unchecked types are hidden and never sent (manual or automatic)"
+                  value={searchSettings.event_allowlist || []}
+                  onChange={(vals) => setSearchSettings((prev) => (prev ? { ...prev, event_allowlist: vals } : prev))}
+                >
+                  <Group gap="sm">
+                    {eventTypeOptions.map((opt) => (
+                      <Checkbox key={opt.value} value={opt.value} label={opt.label} />
+                    ))}
+                  </Group>
+                </Checkbox.Group>
+              </div>
+            </Tooltip>
             <Group gap="sm" align="center" wrap="wrap">
-              <Switch
-                label="Allow HDR releases"
-                checked={searchSettings.allow_hdr}
-                onChange={(e) =>
-                  setSearchSettings((prev) => (prev ? { ...prev, allow_hdr: e.currentTarget.checked } : prev))
-                }
-              />
-              <Select
-                label="Default downloader"
-                placeholder="Use first enabled"
-                data={downloaders.map((dl) => ({ value: String(dl.id), label: dl.name }))}
-                value={searchSettings.default_downloader_id ? String(searchSettings.default_downloader_id) : null}
-                onChange={(val) =>
-                  setSearchSettings((prev) =>
-                    prev ? { ...prev, default_downloader_id: val ? Number(val) : null } : prev
-                  )
-                }
-                clearable
-                maw={240}
-                comboboxProps={{ withinPortal: true }}
-              />
+              <Tooltip label="Permit HDR releases when available" withArrow position="top" withinPortal={false}>
+                <Switch
+                  label="Allow HDR releases"
+                  checked={searchSettings.allow_hdr}
+                  onChange={(e) =>
+                    setSearchSettings((prev) => (prev ? { ...prev, allow_hdr: e.currentTarget.checked } : prev))
+                  }
+                />
+              </Tooltip>
+              <Tooltip label="Used for auto-downloads unless overridden" withArrow position="top" withinPortal={false}>
+                <Select
+                  label="Default downloader"
+                  placeholder="Use first enabled"
+                  data={downloaders.map((dl) => ({ value: String(dl.id), label: dl.name }))}
+                  value={searchSettings.default_downloader_id ? String(searchSettings.default_downloader_id) : null}
+                  onChange={(val) =>
+                    setSearchSettings((prev) =>
+                      prev ? { ...prev, default_downloader_id: val ? Number(val) : null } : prev
+                    )
+                  }
+                  clearable
+                  maw={240}
+                  comboboxProps={{ withinPortal: true }}
+                />
+              </Tooltip>
             </Group>
             <Group gap="sm" align="flex-end" wrap="wrap">
-              <TextInput
-                label="Preferred codecs (comma-separated)"
-                placeholder="x265, HEVC, H.265"
-                value={searchSettings.preferred_codecs.join(", ")}
-                onChange={(e) => updateCsvSetting("preferred_codecs", e.currentTarget.value)}
-                maw={340}
-              />
-              <TextInput
-                label="Preferred release groups (comma-separated)"
-                placeholder="NTb, DON"
-                value={searchSettings.preferred_groups.join(", ")}
-                onChange={(e) => updateCsvSetting("preferred_groups", e.currentTarget.value)}
-                maw={340}
-              />
+              <Tooltip label="Comma-separated; boosts these codecs in scoring" withArrow position="top" withinPortal={false}>
+                <TextInput
+                  label="Preferred codecs (comma-separated)"
+                  placeholder="x265, HEVC, H.265"
+                  value={searchSettings.preferred_codecs.join(", ")}
+                  onChange={(e) => updateCsvSetting("preferred_codecs", e.currentTarget.value)}
+                  maw={340}
+                />
+              </Tooltip>
+              <Tooltip label="Comma-separated; boosts these groups in scoring" withArrow position="top" withinPortal={false}>
+                <TextInput
+                  label="Preferred release groups (comma-separated)"
+                  placeholder="NTb, DON"
+                  value={searchSettings.preferred_groups.join(", ")}
+                  onChange={(e) => updateCsvSetting("preferred_groups", e.currentTarget.value)}
+                  maw={340}
+                />
+              </Tooltip>
             </Group>
             <Group gap="sm">
               <Button type="button" onClick={saveSearchSettings} loading={searchSettingsSaving}>
@@ -1637,42 +1833,50 @@ export function Settings() {
             onChange={(e) => setNewIndexer({ ...newIndexer, name: e.currentTarget.value })}
             onKeyDown={stopKeyProp}
           />
-          <TextInput
-            label="API URL"
-            placeholder="https://api.nzbgeek.info"
-            value={newIndexer.api_url}
-            onChange={(e) => setNewIndexer({ ...newIndexer, api_url: e.currentTarget.value })}
-            maw={320}
-            onKeyDown={stopKeyProp}
-          />
-          <TextInput
-            label="API Key"
-            placeholder="Your API key"
-            value={newIndexer.api_key || ""}
-            onChange={(e) => setNewIndexer({ ...newIndexer, api_key: e.currentTarget.value })}
-            maw={280}
-            onKeyDown={(e) => {
-              stopKeyProp(e);
-              handleControlledBackspace(e, newIndexer.api_key || "", (next) =>
-                setNewIndexer({ ...newIndexer, api_key: next })
-              );
-            }}
-            autoComplete="off"
-            type="text"
-          />
-          <TextInput
-            label="Category"
-            placeholder="optional, e.g. 5030"
-            value={newIndexer.category || ""}
-            onChange={(e) => setNewIndexer({ ...newIndexer, category: e.currentTarget.value })}
-            maw={200}
-            onKeyDown={stopKeyProp}
-          />
-          <Switch
-            label="Enabled"
-            checked={newIndexer.enabled}
-            onChange={(e) => setNewIndexer({ ...newIndexer, enabled: e.currentTarget.checked })}
-          />
+          <Tooltip label="Base URL of your Newznab/Hydra indexer (no trailing /api)" withArrow>
+            <TextInput
+              label="API URL"
+              placeholder="https://api.nzbgeek.info"
+              value={newIndexer.api_url}
+              onChange={(e) => setNewIndexer({ ...newIndexer, api_url: e.currentTarget.value })}
+              maw={320}
+              onKeyDown={stopKeyProp}
+            />
+          </Tooltip>
+          <Tooltip label="Get this from your indexer account/API settings" withArrow>
+            <TextInput
+              label="API Key"
+              placeholder="Your API key"
+              value={newIndexer.api_key || ""}
+              onChange={(e) => setNewIndexer({ ...newIndexer, api_key: e.currentTarget.value })}
+              maw={280}
+              onKeyDown={(e) => {
+                stopKeyProp(e);
+                handleControlledBackspace(e, newIndexer.api_key || "", (next) =>
+                  setNewIndexer({ ...newIndexer, api_key: next })
+                );
+              }}
+              autoComplete="off"
+              type="text"
+            />
+          </Tooltip>
+          <Tooltip label="Optional category number for filtering results" withArrow>
+            <TextInput
+              label="Category"
+              placeholder="optional, e.g. 5030"
+              value={newIndexer.category || ""}
+              onChange={(e) => setNewIndexer({ ...newIndexer, category: e.currentTarget.value })}
+              maw={200}
+              onKeyDown={stopKeyProp}
+            />
+          </Tooltip>
+          <Tooltip label="Include this indexer in searches" withArrow>
+            <Switch
+              label="Enabled"
+              checked={newIndexer.enabled}
+              onChange={(e) => setNewIndexer({ ...newIndexer, enabled: e.currentTarget.checked })}
+            />
+          </Tooltip>
           <Button
             type="button"
             onClick={createIndexer}
@@ -1726,63 +1930,75 @@ export function Settings() {
             onChange={(e) => setNewDownloader({ ...newDownloader, name: e.currentTarget.value })}
             onKeyDown={stopKeyProp}
           />
-          <Select
-            label="Type"
-            data={[
-              { value: "sabnzbd", label: "SABnzbd" },
-              { value: "nzbget", label: "NZBGet" },
-            ]}
-            value={newDownloader.type}
-            onChange={(val) => setNewDownloader({ ...newDownloader, type: val || "sabnzbd" })}
-            maw={180}
-            comboboxProps={{ withinPortal: true }}
-          />
-          <TextInput
-            label="API URL"
-            placeholder="http://sab.example:8080"
-            value={newDownloader.api_url}
-            onChange={(e) => setNewDownloader({ ...newDownloader, api_url: e.currentTarget.value })}
-            maw={320}
-            onKeyDown={stopKeyProp}
-          />
-          <TextInput
-            label="API Key / Password"
-            placeholder="API key"
-            value={newDownloader.api_key || ""}
-            onChange={(e) => setNewDownloader({ ...newDownloader, api_key: e.currentTarget.value })}
-            maw={240}
-            onKeyDown={(e) => {
-              stopKeyProp(e);
-              handleControlledBackspace(e, newDownloader.api_key || "", (next) =>
-                setNewDownloader({ ...newDownloader, api_key: next })
-              );
-            }}
-            autoComplete="off"
-            type="text"
-          />
-          <TextInput
-            label="Category"
-            placeholder="optional"
-            value={newDownloader.category || ""}
-            onChange={(e) => setNewDownloader({ ...newDownloader, category: e.currentTarget.value })}
-            maw={200}
-            onKeyDown={stopKeyProp}
-          />
-          <NumberInput
-            label="Priority"
-            placeholder="optional"
-            value={newDownloader.priority ?? undefined}
-            onChange={(val) =>
-              setNewDownloader({ ...newDownloader, priority: typeof val === "number" ? val : null })
-            }
-            allowDecimal={false}
-            maw={140}
-          />
-          <Switch
-            label="Enabled"
-            checked={newDownloader.enabled}
-            onChange={(e) => setNewDownloader({ ...newDownloader, enabled: e.currentTarget.checked })}
-          />
+          <Tooltip label="Downloader kind (e.g., SABnzbd or NZBGet)" withArrow>
+            <Select
+              label="Type"
+              data={[
+                { value: "sabnzbd", label: "SABnzbd" },
+                { value: "nzbget", label: "NZBGet" },
+              ]}
+              value={newDownloader.type}
+              onChange={(val) => setNewDownloader({ ...newDownloader, type: val || "sabnzbd" })}
+              maw={180}
+              comboboxProps={{ withinPortal: true }}
+            />
+          </Tooltip>
+          <Tooltip label="Base URL to the downloader API (include port)" withArrow>
+            <TextInput
+              label="API URL"
+              placeholder="http://sab.example:8080"
+              value={newDownloader.api_url}
+              onChange={(e) => setNewDownloader({ ...newDownloader, api_url: e.currentTarget.value })}
+              maw={320}
+              onKeyDown={stopKeyProp}
+            />
+          </Tooltip>
+          <Tooltip label="API key or password from downloader settings" withArrow>
+            <TextInput
+              label="API Key / Password"
+              placeholder="API key"
+              value={newDownloader.api_key || ""}
+              onChange={(e) => setNewDownloader({ ...newDownloader, api_key: e.currentTarget.value })}
+              maw={240}
+              onKeyDown={(e) => {
+                stopKeyProp(e);
+                handleControlledBackspace(e, newDownloader.api_key || "", (next) =>
+                  setNewDownloader({ ...newDownloader, api_key: next })
+                );
+              }}
+              autoComplete="off"
+              type="text"
+            />
+          </Tooltip>
+          <Tooltip label="Downloader category/label to route F1 downloads" withArrow>
+            <TextInput
+              label="Category"
+              placeholder="optional"
+              value={newDownloader.category || ""}
+              onChange={(e) => setNewDownloader({ ...newDownloader, category: e.currentTarget.value })}
+              maw={200}
+              onKeyDown={stopKeyProp}
+            />
+          </Tooltip>
+          <Tooltip label="Optional queue priority (uses downloader default if empty)" withArrow>
+            <NumberInput
+              label="Priority"
+              placeholder="optional"
+              value={newDownloader.priority ?? undefined}
+              onChange={(val) =>
+                setNewDownloader({ ...newDownloader, priority: typeof val === "number" ? val : null })
+              }
+              allowDecimal={false}
+              maw={140}
+            />
+          </Tooltip>
+          <Tooltip label="Use this downloader for sends" withArrow>
+            <Switch
+              label="Enabled"
+              checked={newDownloader.enabled}
+              onChange={(e) => setNewDownloader({ ...newDownloader, enabled: e.currentTarget.checked })}
+            />
+          </Tooltip>
           <Button
             type="button"
             onClick={createDownloader}
