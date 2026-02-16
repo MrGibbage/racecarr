@@ -8,6 +8,16 @@ def configure_logging(level: str | None = None) -> None:
     settings = get_settings()
     settings.log_path.parent.mkdir(parents=True, exist_ok=True)
     log_level = (level or settings.log_level).upper()
+    for name in (
+        "TRACE",
+        "DEBUG",
+        "INFO",
+        "SUCCESS",
+        "WARNING",
+        "ERROR",
+        "CRITICAL",
+    ):
+        logger.level(name, icon="")
     logger.remove()
     logger.add(
         sys.stdout,

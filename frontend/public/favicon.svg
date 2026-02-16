@@ -1,0 +1,14 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="64" height="64" rx="12" fill="#0B1221" />
+  <path d="M16 12V56" stroke="#E5E7EB" stroke-width="4" stroke-linecap="round" />
+  <path d="M20 16C24 16 28 14 32 14C36 14 40 16 44 16C48 16 52 14 56 14V34C52 34 48 36 44 36C40 36 36 34 32 34C28 34 24 36 20 36V16Z" fill="#F97316" />
+  <path d="M20 16C24 16 28 14 32 14C36 14 40 16 44 16C48 16 52 14 56 14V34C52 34 48 36 44 36C40 36 36 34 32 34C28 34 24 36 20 36V16Z" fill="url(#checks)" fill-opacity="0.9" />
+  <defs>
+    <pattern id="checks" x="0" y="0" width="8" height="8" patternUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="4" height="4" fill="#111827" />
+      <rect x="4" y="4" width="4" height="4" fill="#111827" />
+      <rect x="4" y="0" width="4" height="4" fill="#E5E7EB" />
+      <rect x="0" y="4" width="4" height="4" fill="#E5E7EB" />
+    </pattern>
+  </defs>
+</svg>
