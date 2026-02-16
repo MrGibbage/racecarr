@@ -218,6 +218,14 @@ const notificationEventOptions = [
   { value: "download-fail", label: "Download fail" },
 ];
 
+const maskAppriseUrl = (url: string) => {
+  if (!url) return "";
+  const idx = url.indexOf("://");
+  if (idx === -1) return "**** hidden ****";
+  const scheme = url.slice(0, idx);
+  return `${scheme}://**** hidden ****`;
+};
+
 export function Settings() {
   const [indexers, setIndexers] = useState<Indexer[]>([]);
   const [loading, setLoading] = useState(false);
@@ -1492,138 +1500,142 @@ export function Settings() {
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {notificationTargets.map((target, index) => (
-                  <Table.Tr key={`${target.type}-${index}-${target.url}`}>
-                    <Table.Td w={180} miw={160} maw={200}>
-                      {editingNotificationIndex === index && editNotificationPayload ? (
-                        <Select
-                          data={notificationTypeOptions}
-                          value={editNotificationPayload.type}
-                          onChange={(val) => setEditNotificationPayload((prev) => (prev ? { ...prev, type: val || "apprise" } : prev))}
-                          size="xs"
-                          w="100%"
-                          maw="100%"
-                          comboboxProps={{ withinPortal: true }}
-                        />
-                      ) : (
-                        notificationTypeOptions.find((opt) => opt.value === target.type)?.label || target.type
-                      )}
-                    </Table.Td>
-                    <Table.Td w={220} miw={160} maw={240}>
-                      {editingNotificationIndex === index && editNotificationPayload ? (
-                        <TextInput
-                          value={editNotificationPayload.name || ""}
-                          onChange={(e) => setEditNotificationPayload((prev) => (prev ? { ...prev, name: e.currentTarget.value } : prev))}
-                          size="xs"
-                          placeholder="Name"
-                          onKeyDown={stopKeyProp}
-                          w="100%"
-                          maw="100%"
-                        />
-                      ) : (
-                        target.name || "(unnamed)"
-                      )}
-                    </Table.Td>
-                    <Table.Td w={420} miw={360} maw={520}>
-                      {editingNotificationIndex === index && editNotificationPayload ? (
-                        <Stack gap={4} w="100%">
-                          <TextInput
-                            value={editNotificationPayload.url}
-                            onChange={(e) => setEditNotificationPayload((prev) => (prev ? { ...prev, url: e.currentTarget.value } : prev))}
+                {notificationTargets.map((target, index) => {
+                  const displayUrl = target.type === "apprise" ? maskAppriseUrl(target.url) : target.url;
+
+                  return (
+                    <Table.Tr key={`${target.type}-${index}-${target.url}`}>
+                      <Table.Td w={180} miw={160} maw={200}>
+                        {editingNotificationIndex === index && editNotificationPayload ? (
+                          <Select
+                            data={notificationTypeOptions}
+                            value={editNotificationPayload.type}
+                            onChange={(val) => setEditNotificationPayload((prev) => (prev ? { ...prev, type: val || "apprise" } : prev))}
                             size="xs"
-                            placeholder={editNotificationPayload.type === "webhook" ? "https://example.com/webhook" : "apprise://"}
+                            w="100%"
+                            maw="100%"
+                            comboboxProps={{ withinPortal: true }}
+                          />
+                        ) : (
+                          notificationTypeOptions.find((opt) => opt.value === target.type)?.label || target.type
+                        )}
+                      </Table.Td>
+                      <Table.Td w={220} miw={160} maw={240}>
+                        {editingNotificationIndex === index && editNotificationPayload ? (
+                          <TextInput
+                            value={editNotificationPayload.name || ""}
+                            onChange={(e) => setEditNotificationPayload((prev) => (prev ? { ...prev, name: e.currentTarget.value } : prev))}
+                            size="xs"
+                            placeholder="Name"
                             onKeyDown={stopKeyProp}
                             w="100%"
                             maw="100%"
                           />
-                          {editNotificationPayload.type === "webhook" && (
-                            <PasswordInput
-                              value={editNotificationPayload.secret || ""}
-                              onChange={(e) => setEditNotificationPayload((prev) => (prev ? { ...prev, secret: e.currentTarget.value } : prev))}
+                        ) : (
+                          target.name || "(unnamed)"
+                        )}
+                      </Table.Td>
+                      <Table.Td w={420} miw={360} maw={520}>
+                        {editingNotificationIndex === index && editNotificationPayload ? (
+                          <Stack gap={4} w="100%">
+                            <TextInput
+                              value={editNotificationPayload.url}
+                              onChange={(e) => setEditNotificationPayload((prev) => (prev ? { ...prev, url: e.currentTarget.value } : prev))}
                               size="xs"
-                              placeholder="Secret (optional)"
+                              placeholder={editNotificationPayload.type === "webhook" ? "https://example.com/webhook" : "apprise://"}
                               onKeyDown={stopKeyProp}
-                              autoComplete="off"
                               w="100%"
                               maw="100%"
                             />
-                          )}
-                          <Checkbox.Group
-                            value={editNotificationPayload.events || []}
-                            onChange={(vals) => setEditNotificationPayload((prev) => (prev ? { ...prev, events: vals } : prev))}
-                            label="Send for"
-                          >
-                            <Group gap="xs">
-                              {notificationEventOptions.map((opt) => (
-                                <Checkbox key={opt.value} value={opt.value} label={opt.label} />
-                              ))}
-                            </Group>
-                          </Checkbox.Group>
-                        </Stack>
-                      ) : (
-                        <Stack gap={4} w="100%">
-                          <Text size="sm">{target.url}</Text>
-                          <Group gap="xs" wrap="wrap">
-                            {(target.events && target.events.length ? target.events : notificationEventOptions.map((opt) => opt.value)).map((ev) => {
-                              const label = notificationEventOptions.find((o) => o.value === ev)?.label || ev;
-                              return (
-                                <Badge key={ev} variant="light" color="gray">
-                                  {label}
-                                </Badge>
-                              );
-                            })}
-                          </Group>
-                        </Stack>
-                      )}
-                    </Table.Td>
-                    <Table.Td w={200} miw={160} maw={220}>
-                      <Group gap="xs">
-                        {editingNotificationIndex === index ? (
-                          <>
-                            <Button
-                              size="xs"
-                              variant="filled"
-                              onClick={saveEditNotification}
-                              loading={notificationSavingIndex === index}
-                              type="button"
+                            {editNotificationPayload.type === "webhook" && (
+                              <PasswordInput
+                                value={editNotificationPayload.secret || ""}
+                                onChange={(e) => setEditNotificationPayload((prev) => (prev ? { ...prev, secret: e.currentTarget.value } : prev))}
+                                size="xs"
+                                placeholder="Secret (optional)"
+                                onKeyDown={stopKeyProp}
+                                autoComplete="off"
+                                w="100%"
+                                maw="100%"
+                              />
+                            )}
+                            <Checkbox.Group
+                              value={editNotificationPayload.events || []}
+                              onChange={(vals) => setEditNotificationPayload((prev) => (prev ? { ...prev, events: vals } : prev))}
+                              label="Send for"
                             >
-                              Save
-                            </Button>
-                            <Button size="xs" variant="default" onClick={cancelEditNotification} type="button">
-                              Cancel
-                            </Button>
-                          </>
+                              <Group gap="xs">
+                                {notificationEventOptions.map((opt) => (
+                                  <Checkbox key={opt.value} value={opt.value} label={opt.label} />
+                                ))}
+                              </Group>
+                            </Checkbox.Group>
+                          </Stack>
                         ) : (
-                          <>
-                            <Button
-                              size="xs"
-                              variant="light"
-                              onClick={() => testNotificationTarget(index)}
-                              loading={notificationTestingIndex === index}
-                              disabled={notificationTesting}
-                              type="button"
-                            >
-                              Test
-                            </Button>
-                            <Button size="xs" variant="default" onClick={() => startEditNotification(index)} type="button">
-                              Edit
-                            </Button>
-                            <Button
-                              size="xs"
-                              color="red"
-                              variant="subtle"
-                              onClick={() => deleteNotificationTarget(index)}
-                              loading={notificationDeletingIndex === index}
-                              type="button"
-                            >
-                              Delete
-                            </Button>
-                          </>
+                          <Stack gap={4} w="100%">
+                            <Text size="sm">{displayUrl}</Text>
+                            <Group gap="xs" wrap="wrap">
+                              {(target.events && target.events.length ? target.events : notificationEventOptions.map((opt) => opt.value)).map((ev) => {
+                                const label = notificationEventOptions.find((o) => o.value === ev)?.label || ev;
+                                return (
+                                  <Badge key={ev} variant="light" color="gray">
+                                    {label}
+                                  </Badge>
+                                );
+                              })}
+                            </Group>
+                          </Stack>
                         )}
-                      </Group>
-                    </Table.Td>
-                  </Table.Tr>
-                ))}
+                      </Table.Td>
+                      <Table.Td w={200} miw={160} maw={220}>
+                        <Group gap="xs">
+                          {editingNotificationIndex === index ? (
+                            <>
+                              <Button
+                                size="xs"
+                                variant="filled"
+                                onClick={saveEditNotification}
+                                loading={notificationSavingIndex === index}
+                                type="button"
+                              >
+                                Save
+                              </Button>
+                              <Button size="xs" variant="default" onClick={cancelEditNotification} type="button">
+                                Cancel
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Button
+                                size="xs"
+                                variant="light"
+                                onClick={() => testNotificationTarget(index)}
+                                loading={notificationTestingIndex === index}
+                                disabled={notificationTesting}
+                                type="button"
+                              >
+                                Test
+                              </Button>
+                              <Button size="xs" variant="default" onClick={() => startEditNotification(index)} type="button">
+                                Edit
+                              </Button>
+                              <Button
+                                size="xs"
+                                color="red"
+                                variant="subtle"
+                                onClick={() => deleteNotificationTarget(index)}
+                                loading={notificationDeletingIndex === index}
+                                type="button"
+                              >
+                                Delete
+                              </Button>
+                            </>
+                          )}
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>
+                  );
+                })}
               </Table.Tbody>
             </Table>
           ) : (
