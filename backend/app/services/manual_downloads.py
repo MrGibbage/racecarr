@@ -46,6 +46,13 @@ def record_manual_download(session: Session, *, tag: str, title: str, downloader
         },
     )
     session.commit()
+    logger.info(
+        "manual_download_recorded",
+        tag=tag,
+        title=title,
+        downloader_id=downloader_id,
+        status=STATUS_PENDING,
+    )
 
 
 def list_manual_pending(session: Session) -> list[dict]:
@@ -60,7 +67,9 @@ def list_manual_pending(session: Session) -> list[dict]:
         ),
         {"status": STATUS_PENDING},
     ).mappings()
-    return [dict(row) for row in rows]
+    data = [dict(row) for row in rows]
+    logger.debug("manual_download_pending", count=len(data))
+    return data
 
 
 def update_manual_status(
@@ -82,3 +91,4 @@ def update_manual_status(
         {"status": status, "last_error": last_error, "tag": tag},
     )
     session.commit()
+    logger.info("manual_download_updated", tag=tag, status=status, has_error=bool(last_error), last_error=last_error)

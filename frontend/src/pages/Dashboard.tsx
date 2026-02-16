@@ -109,6 +109,11 @@ const normalizeEventType = (value?: string | null) => {
   return normalized.replace(/\s+/g, "-");
 };
 
+const isSprintEvent = (value?: string | null) => {
+  const t = normalizeEventType(value);
+  return t === "sprint" || t === "sprint-qualifying" || t === "sprint-shootout";
+};
+
 const utcFormatter = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
   month: "short",
@@ -611,6 +616,8 @@ export function Dashboard() {
             </Badge>
             {(() => {
               const formatted = formatDatePair(ev.start_time_utc);
+              const sprintMissingSchedule = isSprintEvent(ev.type) && !formatted;
+              if (sprintMissingSchedule) return <Text size="sm" c="dimmed">N/A</Text>;
               if (!formatted) return <Text size="sm" c="dimmed">TBD</Text>;
               return (
                 <Stack gap={0}>
@@ -622,11 +629,20 @@ export function Dashboard() {
             {(() => {
               const key = watchKey(round.id ?? 0, ev.type);
               const scheduled = watchlistMap[key];
+              const formatted = formatDatePair(ev.start_time_utc);
+              const sprintMissingSchedule = isSprintEvent(ev.type) && !formatted;
               if (scheduled) {
                 return (
                   <Badge color="teal" variant="light" size="sm">
                     Watchlist
                   </Badge>
+                );
+              }
+              if (sprintMissingSchedule) {
+                return (
+                  <Text size="sm" c="dimmed">
+                    Not available
+                  </Text>
                 );
               }
               return (

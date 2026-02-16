@@ -1,8 +1,10 @@
+import time
 from datetime import datetime
 from typing import Any
 import httpx
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
+from loguru import logger
 
 from ..core.config import get_settings
 from ..models.entities import Season, Round, Event
@@ -58,17 +60,38 @@ def _extract_events(schedule: dict[str, Any]) -> list[dict[str, Any]]:
 def refresh_season(session: Session, year: int) -> Season:
     settings = get_settings()
     url = f"{settings.f1api_base_url}/api/{year}"
+    started = time.monotonic()
+    logger.info("f1api_fetch_start", url=url, year=year)
     try:
         resp = httpx.get(url, timeout=15)
         resp.raise_for_status()
     except httpx.HTTPStatusError as exc:
+        duration_ms = int((time.monotonic() - started) * 1000)
+        logger.warning(
+            "f1api_fetch_non_200",
+            url=url,
+            year=year,
+            status=exc.response.status_code,
+            duration_ms=duration_ms,
+        )
         detail = f"f1api responded {exc.response.status_code} for {url}"
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=detail) from exc
     except httpx.RequestError as exc:
+        duration_ms = int((time.monotonic() - started) * 1000)
+        logger.warning("f1api_fetch_failed", url=url, year=year, error=str(exc), duration_ms=duration_ms)
         detail = f"f1api request failed for {url}: {exc}"
         raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail=detail) from exc
     payload = resp.json()
     races = payload.get("races", [])
+    duration_ms = int((time.monotonic() - started) * 1000)
+    logger.info(
+        "f1api_fetch_ok",
+        url=url,
+        year=year,
+        status=resp.status_code,
+        races=len(races),
+        duration_ms=duration_ms,
+    )
 
     season: Season | None = session.query(Season).filter_by(year=year).first()
     if not season:
@@ -83,6 +106,7 @@ def refresh_season(session: Session, year: int) -> Season:
     season.rounds.clear()
     session.flush()
 
+    event_count = 0
     for race in races:
         round_number = int(race.get("round", 0)) if race.get("round") else 0
         round_obj = Round(
@@ -102,10 +126,19 @@ def refresh_season(session: Session, year: int) -> Season:
                     end_time_utc=ev["end"],
                 )
             )
+            event_count += 1
 
         season.rounds.append(round_obj)
 
     season.last_refreshed = datetime.utcnow()
     session.commit()
     session.refresh(season)
+    total_duration_ms = int((time.monotonic() - started) * 1000)
+    logger.info(
+        "f1api_refresh_done",
+        year=year,
+        rounds=len(season.rounds),
+        events=event_count,
+        duration_ms=total_duration_ms,
+    )
     return season

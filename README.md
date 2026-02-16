@@ -9,7 +9,7 @@
 
 Racecarr is a small FastAPI + React app that searches F1 events across indexers and can auto-send matches to your downloader. F1 uploads to usenet do not follow typical S00E00 episode naming conventions, so sonarr can't reliably find them. This app aims to fill the gap. It's not perfect due to the highly inconsistent naming of F1 uploads, but you should be able to find suitable downloads for most events.
 
-As of Feb 2026 (ver 0.1), this app is very early in testing because I am waiting for a live F1 season to actually test the scheduling. But if you want to give it a shot and provide me feedback, I could use the help!
+As of Feb 2026 (ver 0.5), this app is very early in testing because I am waiting for a live F1 season to actually test the scheduling. But if you want to give it a shot and provide me feedback, I could use the help!
 
 ## Quick start (Docker)
 

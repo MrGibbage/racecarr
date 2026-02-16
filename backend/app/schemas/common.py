@@ -261,9 +261,16 @@ class NotificationTargets(BaseModel):
     targets: list[NotificationTarget] = Field(default_factory=list)
 
 
+class NotificationTestResult(BaseModel):
+    index: int
+    ok: bool
+    error: str | None = None
+
+
 class NotificationTestResponse(BaseModel):
     ok: bool
     errors: list[str] = Field(default_factory=list)
+    results: list[NotificationTestResult] = Field(default_factory=list)
 
 
 class NotificationTargetExport(BaseModel):

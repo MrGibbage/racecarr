@@ -1,4 +1,5 @@
 import httpx
+import time
 from typing import Tuple, List, Dict
 from loguru import logger
 from ..models.entities import Downloader
@@ -49,20 +50,48 @@ def _test_sabnzbd(downloader: Downloader) -> Tuple[bool, str]:
     api_key = downloader.api_key or ""
     url = downloader.api_url.rstrip("/") + "/api"
     params = {"mode": "queue", "output": "json", "apikey": api_key}
-    logger.debug("Testing SABnzbd connection", name=downloader.name, url=url)
+    started = time.monotonic()
+    logger.info("Downloader test start", downloader=downloader.name, type="sabnzbd", url=url)
     try:
         resp = httpx.get(url, params=params, timeout=10)
     except httpx.RequestError as exc:
-        logger.warning("SABnzbd request failed", name=downloader.name, url=url, error=str(exc))
+        duration_ms = int((time.monotonic() - started) * 1000)
+        logger.warning(
+            "Downloader test failed",
+            downloader=downloader.name,
+            type="sabnzbd",
+            url=url,
+            error=str(exc),
+            duration_ms=duration_ms,
+        )
         return False, f"Request failed: {exc}"
     if resp.status_code != 200:
-        logger.warning("SABnzbd non-200", name=downloader.name, status=resp.status_code)
+        duration_ms = int((time.monotonic() - started) * 1000)
+        logger.warning(
+            "Downloader test non-200",
+            downloader=downloader.name,
+            type="sabnzbd",
+            status=resp.status_code,
+            duration_ms=duration_ms,
+        )
         return False, f"HTTP {resp.status_code} from SABnzbd"
     data = resp.json()
     if data.get("status") is False:
-        logger.warning("SABnzbd reported failure", name=downloader.name)
+        duration_ms = int((time.monotonic() - started) * 1000)
+        logger.warning(
+            "Downloader test reported failure",
+            downloader=downloader.name,
+            type="sabnzbd",
+            duration_ms=duration_ms,
+        )
         return False, "SABnzbd reported failure"
-    logger.debug("SABnzbd test succeeded", name=downloader.name)
+    duration_ms = int((time.monotonic() - started) * 1000)
+    logger.info(
+        "Downloader test ok",
+        downloader=downloader.name,
+        type="sabnzbd",
+        duration_ms=duration_ms,
+    )
     return True, "SABnzbd OK"
 
 
@@ -71,6 +100,7 @@ def _send_sabnzbd(
 ) -> Tuple[bool, str]:
     api_key = downloader.api_key or ""
     url = downloader.api_url.rstrip("/") + "/api"
+    started = time.monotonic()
     params = {
         "mode": "addurl",
         "name": nzb_url,
@@ -83,15 +113,59 @@ def _send_sabnzbd(
         params["priority"] = priority
     if title:
         params["nzbname"] = title
+    logger.info(
+        "Downloader send start",
+        downloader=downloader.name,
+        type="sabnzbd",
+        title=title or nzb_url,
+        category=category,
+        priority=priority,
+    )
     try:
         resp = httpx.get(url, params=params, timeout=10)
     except httpx.RequestError as exc:
+        duration_ms = int((time.monotonic() - started) * 1000)
+        logger.warning(
+            "Downloader send failed",
+            downloader=downloader.name,
+            type="sabnzbd",
+            title=title or nzb_url,
+            error=str(exc),
+            duration_ms=duration_ms,
+        )
         return False, f"Request failed: {exc}"
     if resp.status_code != 200:
+        duration_ms = int((time.monotonic() - started) * 1000)
+        logger.warning(
+            "Downloader send non-200",
+            downloader=downloader.name,
+            type="sabnzbd",
+            title=title or nzb_url,
+            status=resp.status_code,
+            duration_ms=duration_ms,
+        )
         return False, f"HTTP {resp.status_code} from SABnzbd add"
     data = resp.json()
     if data.get("status") is True:
+        duration_ms = int((time.monotonic() - started) * 1000)
+        logger.info(
+            "Downloader send ok",
+            downloader=downloader.name,
+            type="sabnzbd",
+            title=title or nzb_url,
+            status=resp.status_code,
+            duration_ms=duration_ms,
+        )
         return True, "Sent to SABnzbd"
+    duration_ms = int((time.monotonic() - started) * 1000)
+    logger.warning(
+        "Downloader send rejected",
+        downloader=downloader.name,
+        type="sabnzbd",
+        title=title or nzb_url,
+        duration_ms=duration_ms,
+        error=data.get("error") or "SABnzbd rejected request",
+    )
     return False, data.get("error") or "SABnzbd rejected request"
 
 
@@ -101,23 +175,58 @@ def _test_nzbget(downloader: Downloader) -> Tuple[bool, str]:
     auth = None
     if downloader.api_key:
         auth = (downloader.api_key, "")
-    logger.debug("Testing NZBGet connection", name=downloader.name, url=url)
+    started = time.monotonic()
+    logger.info("Downloader test start", downloader=downloader.name, type="nzbget", url=url)
     try:
         resp = httpx.post(url, json=payload, timeout=10, auth=auth)
     except httpx.RequestError as exc:
-        logger.warning("NZBGet request failed", name=downloader.name, url=url, error=str(exc))
+        duration_ms = int((time.monotonic() - started) * 1000)
+        logger.warning(
+            "Downloader test failed",
+            downloader=downloader.name,
+            type="nzbget",
+            url=url,
+            error=str(exc),
+            duration_ms=duration_ms,
+        )
         return False, f"Request failed: {exc}"
     if resp.status_code != 200:
-        logger.warning("NZBGet non-200", name=downloader.name, status=resp.status_code)
+        duration_ms = int((time.monotonic() - started) * 1000)
+        logger.warning(
+            "Downloader test non-200",
+            downloader=downloader.name,
+            type="nzbget",
+            status=resp.status_code,
+            duration_ms=duration_ms,
+        )
         return False, f"HTTP {resp.status_code} from NZBGet"
     data = resp.json()
     if data.get("error"):
-        logger.warning("NZBGet error", name=downloader.name, error=data.get("error"))
+        duration_ms = int((time.monotonic() - started) * 1000)
+        logger.warning(
+            "Downloader test error",
+            downloader=downloader.name,
+            type="nzbget",
+            error=data.get("error"),
+            duration_ms=duration_ms,
+        )
         return False, f"NZBGet error: {data['error']}"
     if "result" not in data:
-        logger.warning("NZBGet missing result", name=downloader.name)
+        duration_ms = int((time.monotonic() - started) * 1000)
+        logger.warning(
+            "Downloader test missing result",
+            downloader=downloader.name,
+            type="nzbget",
+            duration_ms=duration_ms,
+        )
         return False, "Unexpected NZBGet response"
-    logger.debug("NZBGet test succeeded", name=downloader.name)
+    duration_ms = int((time.monotonic() - started) * 1000)
+    logger.info(
+        "Downloader test ok",
+        downloader=downloader.name,
+        type="nzbget",
+        duration_ms=duration_ms,
+    )
     return True, "NZBGet OK"
 
 
@@ -135,17 +244,70 @@ def _send_nzbget(
     auth = None
     if downloader.api_key:
         auth = (downloader.api_key, "")
+    started = time.monotonic()
+    logger.info(
+        "Downloader send start",
+        downloader=downloader.name,
+        type="nzbget",
+        title=name,
+        category=category,
+        priority=priority,
+    )
     try:
         resp = httpx.post(url, json=payload, timeout=10, auth=auth)
     except httpx.RequestError as exc:
+        duration_ms = int((time.monotonic() - started) * 1000)
+        logger.warning(
+            "Downloader send failed",
+            downloader=downloader.name,
+            type="nzbget",
+            title=name,
+            error=str(exc),
+            duration_ms=duration_ms,
+        )
         return False, f"Request failed: {exc}"
     if resp.status_code != 200:
+        duration_ms = int((time.monotonic() - started) * 1000)
+        logger.warning(
+            "Downloader send non-200",
+            downloader=downloader.name,
+            type="nzbget",
+            title=name,
+            status=resp.status_code,
+            duration_ms=duration_ms,
+        )
         return False, f"HTTP {resp.status_code} from NZBGet appendurl"
     data = resp.json()
     if data.get("error"):
+        duration_ms = int((time.monotonic() - started) * 1000)
+        logger.warning(
+            "Downloader send error",
+            downloader=downloader.name,
+            type="nzbget",
+            title=name,
+            error=data.get("error"),
+            duration_ms=duration_ms,
+        )
         return False, f"NZBGet error: {data['error']}"
     if data.get("result") is True:
+        duration_ms = int((time.monotonic() - started) * 1000)
+        logger.info(
+            "Downloader send ok",
+            downloader=downloader.name,
+            type="nzbget",
+            title=name,
+            status=resp.status_code,
+            duration_ms=duration_ms,
+        )
         return True, "Sent to NZBGet"
+    duration_ms = int((time.monotonic() - started) * 1000)
+    logger.warning(
+        "Downloader send rejected",
+        downloader=downloader.name,
+        type="nzbget",
+        title=name,
+        duration_ms=duration_ms,
+    )
     return False, "NZBGet rejected request"
 
 
