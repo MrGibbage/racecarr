@@ -1706,10 +1706,10 @@ def recent_logs(auth: AuthSession = Depends(require_auth)) -> list[LogEntry]:
             extra = {}
             for key, val in raw_extra.items():
                 try:
-                    json.dumps(val)
+                    json.dumps(val, default=str)
                     extra[key] = val
-                except Exception:
-                    extra[key] = str(val)
+                except (TypeError, ValueError):
+                    extra[key] = repr(val)
             entries.append(
                 LogEntry(
                     timestamp=record.get("time", {}).get("repr") or record.get("time") or data.get("time", ""),
